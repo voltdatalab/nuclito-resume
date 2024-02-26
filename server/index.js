@@ -6,7 +6,13 @@ import cors from 'cors';
 import GhostContentAPI from '@tryghost/content-api';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+
 dotenv.config();
+
+corsOptions = {
+  origin: process.env.REACT_APP_CORS_ALLOWED_ORIGINS,
+  optionsSuccessStatus: 200
+}
 
 
 // Ghost API configuration
