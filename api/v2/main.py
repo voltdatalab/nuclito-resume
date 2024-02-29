@@ -65,8 +65,9 @@ async def post(
 
 if __name__ == "__main__":
     import uvicorn
+    from database.migrations import posts
 
-    print(os.getenv("WEBHOOK_SECRET"))
+    posts.Post.run()
 
     uvicorn.run(
         app,
