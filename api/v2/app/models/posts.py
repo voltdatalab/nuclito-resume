@@ -2,10 +2,10 @@ from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from datetime import datetime
-from database.migration import Migration
+from app.model import Model
 
 
-class Post(Migration):
+class Post(Model):
     __tablename__ = "posts"
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     title: Mapped[str] = mapped_column(Text(), nullable=True)

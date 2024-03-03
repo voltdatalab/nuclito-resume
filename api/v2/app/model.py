@@ -20,7 +20,7 @@ url_object = URL.create(
 engine = create_engine(url_object, echo=True)
 
 
-class Migration(DeclarativeBase):
+class Model(DeclarativeBase):
     def insert(self):
         try:
             with Session(engine) as session:
@@ -32,7 +32,7 @@ class Migration(DeclarativeBase):
     @staticmethod
     def run():
         print("running migration...")
-        Migration.metadata.create_all(engine)
+        Model.metadata.create_all(engine)
         print("migration successful!")
 
     @classmethod
