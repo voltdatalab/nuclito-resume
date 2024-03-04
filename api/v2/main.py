@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Header, Request, Response
 from pydantic import BaseModel
-from datetime import datetime
 from dotenv import load_dotenv
+from app.controllers import post_controller
 import os
 import hmac
 import logging
+import json
 
 load_dotenv()
 
@@ -14,8 +15,7 @@ class WebhookResponse(BaseModel):
 
 
 class WebhookData(BaseModel):
-    data: dict
-    timestamp: datetime
+    post: dict
 
 
 APP_NAME = os.getenv("APP_NAME", "nuclito-responde.api.v2")
@@ -59,13 +59,19 @@ async def post(
         response.status_code = 401
         return {"result": "Invalid message signature"}
 
-    # TODO: call OpenAI API and store result
+    post_data = json.loads(raw_input)["post"]["current"]
+    id = post_data["id"]
+    title = post_data["title"]
+    link = post_data["url"]
+    content = post_data["plaintext"]
+
+    await post_controller.create(id, title, link, content)
     logger.info("Message signature checked ok")
 
 
 if __name__ == "__main__":
     import uvicorn
-    from database.migrations import posts
+    from app.models import posts
 
     posts.Post.run()
 

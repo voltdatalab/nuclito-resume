@@ -8,8 +8,8 @@ from app.model import Model
 class Post(Model):
     __tablename__ = "posts"
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    title: Mapped[str] = mapped_column(Text(), nullable=True)
-    link: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(Text)
+    link: Mapped[str] = mapped_column(String(256))
     summary: Mapped[str] = mapped_column(Text())
     timestamp: Mapped[datetime] = mapped_column(DateTime(), default=datetime.now())
 

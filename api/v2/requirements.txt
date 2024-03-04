@@ -4,3 +4,4 @@ pydantic
 python-dotenv
 sqlalchemy
 mysqlclient
+openai
