@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Header, Request, Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from app.controllers import post_controller
@@ -32,6 +33,21 @@ formatter = logging.Formatter("%(levelname)s:\t%(message)s")
 file_logging = logging.StreamHandler()
 file_logging.setFormatter(formatter)
 logger.addHandler(file_logging)
+
+
+@app.get("/", status_code=200)
+async def get():
+    return {"Hello": "World"}
+
+
+@app.get("/post/", status_code=200, response_class=HTMLResponse)
+async def get_last_posts():
+    return await post_controller.read()
+
+
+@app.get("/post/{amount}", status_code=200, response_class=HTMLResponse)
+async def get_posts(amount):
+    return await post_controller.read(amount)
 
 
 @app.post("/post/", status_code=204)

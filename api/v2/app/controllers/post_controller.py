@@ -21,3 +21,11 @@ async def create(id, title, link, content):
     summary = chat_completion.choices[0].message.content
 
     return Post(id=id, title=title, link=link, summary=summary).insert()
+
+
+async def read(amount=5):
+    posts = Post.select(orderby=Post.timestamp, limit=5)
+    content = ""
+    for post in posts:
+        content += f'<h1>{post.title}</h1><p></p>{post.summary}<p></p><a class="button-tit" href="{post.link}">Quero saber mais</a>'
+    return f"<html><head></head><body>{content}</body></html>"

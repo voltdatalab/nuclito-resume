@@ -36,10 +36,12 @@ class Model(DeclarativeBase):
         print("migration successful!")
 
     @classmethod
-    def select(cls, whereclause=None):
-        result = None
-        if whereclause is None:
-            result = select(cls)
-        else:
-            result = select(cls).where(whereclause)
+    def select(cls, whereclause=None, orderby=None, limit=None):
+        result = select(cls)
+        if whereclause:
+            result = result.where(whereclause)
+        if orderby:
+            result = result.order_by(orderby)
+        if limit:
+            result = result.limit(5)
         return Session(engine).scalars(result)
