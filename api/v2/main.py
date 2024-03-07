@@ -116,4 +116,5 @@ if __name__ == "__main__":
         app,
         host=os.getenv("API_HOST", "localhost"),
         port=int(os.getenv("API_PORT", "8000")),
+        proxy_headers=True,
     )
