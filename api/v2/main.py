@@ -8,6 +8,7 @@ import os
 import hmac
 import logging
 import json
+import re
 
 load_dotenv()
 
@@ -78,9 +79,19 @@ async def post(
         key=os.getenv("WEBHOOK_SECRET").encode(), msg=raw_input, digestmod="sha256"
     )
 
-    if not hmac.compare_digest(input_hmac.hexdigest(), x_ghost_signature):
+    hmac_header_search = re.search("sha256=(.*), t=[0-9]*")
+    if not hmac_header_search:
         logger.error(
-            f"Invalid message signature. Expected token {input_hmac.hexdigest()} but got {x_ghost_signature}"
+            f"Invalid message signature. Expected token in format 'sha256=(.*) t=[0-9]*' but got {x_ghost_signature}"
+        )
+        response.status_code = 401
+        return {"result": "Invalid message signature"}
+
+    sha256 = hmac_header_search.group(1)
+
+    if not hmac.compare_digest(input_hmac.hexdigest(), sha256):
+        logger.error(
+            f"Invalid message signature. Expected token {input_hmac.hexdigest()} but got {sha256}"
         )
         response.status_code = 401
         return {"result": "Invalid message signature"}
