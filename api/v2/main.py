@@ -79,7 +79,9 @@ async def post(
     )
 
     if not hmac.compare_digest(input_hmac.hexdigest(), x_ghost_signature):
-        logger.error("Invalid message signature")
+        logger.error(
+            f"Invalid message signature. Expected token {input_hmac.hexdigest()} but got {x_ghost_signature}"
+        )
         response.status_code = 401
         return {"result": "Invalid message signature"}
 
