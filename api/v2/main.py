@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Header, Request, Response
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from app.controllers import post_controller
@@ -25,6 +26,15 @@ app = FastAPI(
     title=APP_NAME,
     description="API com os dados de resumos de reportagens gerados pelo Nuclito",
     version="2.0",
+)
+
+origins = os.getenv("CORS_ALLOWED_ORIGINS", "*").split()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 logger = logging.getLogger(APP_NAME)
@@ -68,9 +78,7 @@ async def post(
         key=os.getenv("WEBHOOK_SECRET").encode(), msg=raw_input, digestmod="sha256"
     )
 
-    if not hmac.compare_digest(
-        input_hmac.hexdigest(), x_ghost_signature
-    ):
+    if not hmac.compare_digest(input_hmac.hexdigest(), x_ghost_signature):
         logger.error("Invalid message signature")
         response.status_code = 401
         return {"result": "Invalid message signature"}
