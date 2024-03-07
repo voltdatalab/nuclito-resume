@@ -79,7 +79,7 @@ async def post(
         key=os.getenv("WEBHOOK_SECRET").encode(), msg=raw_input, digestmod="sha256"
     )
 
-    hmac_header_search = re.search("sha256=(.*), t=[0-9]*")
+    hmac_header_search = re.search("sha256=(.*), t=[0-9]*", x_ghost_signature)
     if not hmac_header_search:
         logger.error(
             f"Invalid message signature. Expected token in format 'sha256=(.*) t=[0-9]*' but got {x_ghost_signature}"
