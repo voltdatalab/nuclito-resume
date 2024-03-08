@@ -96,14 +96,17 @@ async def post(
         response.status_code = 401
         return {"result": "Invalid message signature"}
 
+    logger.info("Message signature checked ok")
+
     post_data = json.loads(raw_input)["post"]["current"]
     id = post_data["id"]
     title = post_data["title"]
     link = post_data["url"]
     content = post_data["plaintext"]
+    primary_tag = post_data["primary_tag"]["slug"]
 
-    await post_controller.create(id, title, link, content)
-    logger.info("Message signature checked ok")
+    if (not primary_tag.endswith("news")):
+        await post_controller.create(id, title, link, content)
 
 
 if __name__ == "__main__":

@@ -38,10 +38,10 @@ class Model(DeclarativeBase):
     @classmethod
     def select(cls, whereclause=None, orderby=None, limit=None):
         result = select(cls)
-        if whereclause:
+        if whereclause is not None:
             result = result.where(whereclause)
-        if orderby:
+        if orderby is not None:
             result = result.order_by(orderby)
-        if limit:
+        if limit is not None:
             result = result.limit(5)
         return Session(engine).scalars(result)

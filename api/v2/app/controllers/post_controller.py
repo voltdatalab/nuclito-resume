@@ -8,6 +8,10 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def create(id, title, link, content):
+    existing_post = list(Post.select(whereclause=Post.id == id))
+    if len(existing_post) > 0:
+        return existing_post[0]
+
     chat_completion = openai_client.chat.completions.create(
         messages=[
             {
@@ -24,7 +28,7 @@ async def create(id, title, link, content):
 
 
 async def read(amount=5):
-    posts = Post.select(orderby=Post.timestamp, limit=5)
+    posts = Post.select(orderby=Post.timestamp.desc(), limit=5)
     content = ""
     for post in posts:
         content += f'<h1>{post.title}</h1><p></p>{post.summary}<p></p><a class="button-tit" href="{post.link}">Quero saber mais</a>'
