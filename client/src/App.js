@@ -9,7 +9,7 @@ function App() {
 
   useEffect(() => {
     setLoading(true); // Set loading to true when the component mounts and the fetch starts
-    axios.get('http://localhost:8080')
+    axios.get(process.env.REACT_APP_API_URL)
       .then(response => {
         setHtmlContent(response.data); // Update state with the HTML content
         setLoading(false); // Set loading to false once data is received
