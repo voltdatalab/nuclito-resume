@@ -11,7 +11,7 @@ dotenv.config();
 
 // Ghost API configuration
 const api = new GhostContentAPI({
-  url: process.env.REACT_APP_GHOST_CONTENT_URL,
+  url: 'https://nucleo.jor.br',
   key: process.env.REACT_APP_GHOST_CONTENT_API,
   version: "v5.0"
 });
@@ -32,7 +32,7 @@ function htmlToPlainText(html) {
 
 async function fetchPosts() {
   try {
-      const posts = await api.posts.browse({limit: 5, include: 'tags,authors'});
+      const posts = await api.posts.browse({limit: 6, include: 'tags,authors'});
       let content = []; // Use a local variable instead of a global one
       posts.forEach((post) => {
           // Convert HTML to plain text if necessary
@@ -78,25 +78,58 @@ async function summarizeContent(content) {
 app.use(cors())
 
 app.get('/', async (req, res) => {
-    const postsContent = await fetchPosts(); // Fetches all posts
-    if (postsContent && postsContent.length > 0) {
-      let summariesHtml = ''; // Initialize an empty string to hold all summaries HTML
-  
-      // Iterate through each post, summarize it, and append its summary to the summariesHtml string
-      for (const post of postsContent) {
-        const summary = await summarizeContent(post.plainText);
-        // Append this post's title, summary, and URL to the summariesHtml string
-        summariesHtml += `<h1 class="tit">${post.title}</h1>
-        <p>${summary}</p>
-        <a class="button-tit" href="${post.url}">Quero saber mais</a><br><br>`;
-      }
-  
-      // Send the concatenated summaries as the response
-      res.send(summariesHtml);
-    } else {
-      res.send(`<p>Erro, por favor tente de novo ou avise o Núcleo em comunidade@nucleo.jor.br</p>`);
+  const postsContent = await fetchPosts(); // Fetches all posts
+  if (postsContent && postsContent.length > 0) {
+    let summariesHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Post Summaries</title>
+      <!-- Include Bootstrap CSS -->
+      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    </head>
+    <body>
+      <div class="container">
+        <div class="row g-3" id="masonry-layout">`; // Start the Bootstrap container and the first row
+
+    // Iterate through each post, summarize it, and append its summary to the summariesHtml string
+    for (const post of postsContent) {
+      const summary = await summarizeContent(post.plainText);
+      // Append this post's title, summary, and URL to the summariesHtml string using Bootstrap columns
+      summariesHtml += `
+        <div class="col-sm-6 col-md-4 mb-4"> <!-- Bootstrap column for 3 columns per row -->
+          <div class="card">
+            <h1 class="tit">${post.title}</h1>
+            <p>${summary}</p>
+            <a class="btn btn-primary button-tit" href="${post.url}">Quero saber mais</a>
+          </div>
+        </div>`;
     }
-  });
+
+    summariesHtml += `
+        </div> <!-- End of row -->
+      </div> <!-- End of container -->
+      <script>
+      var elem = document.querySelector('#masonry-layout');
+      var msnry = new Masonry(elem, {
+        // Options
+        itemSelector: '.col-sm-6', // Use your column classes here
+        columnWidth: '.col-sm-6', // Or a fixed number
+        percentPosition: true
+      });
+      </script>
+    </body>
+    </html>`;
+
+    // Send the concatenated summaries as the response
+    res.send(summariesHtml);
+  } else {
+    res.send(`<p>Erro, por favor tente de novo ou avise o Núcleo em comunidade@nucleo.jor.br</p>`);
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
