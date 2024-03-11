@@ -43,5 +43,5 @@ class Model(DeclarativeBase):
         if orderby is not None:
             result = result.order_by(orderby)
         if limit is not None:
-            result = result.limit(5)
+            result = result.limit(limit)
         return Session(engine).scalars(result)
