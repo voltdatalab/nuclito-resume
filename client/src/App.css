@@ -68,7 +68,7 @@ body{
   font-family: "Barlow", sans-serif;
 }
 
-.card h1, .card p {
+.card h2, .card p {
   margin: 0 0 10px 0;
 }
 
@@ -78,21 +78,22 @@ body{
 }
 
 .card ul li {
+  color: #eeeeee;
+  font-weight: bold;
   margin-left: 15px;
   position: relative;
   margin-bottom: 10px;
   border-bottom: 1px solid #eeeeee;
   padding-bottom: 10px;
+  /* padding-left: 10px; */
 }
 
 .card ul li:before {
   content: '✅'; /* Custom bullet */
-  /*color: #e2a805;  Bullet color */
-  font-weight: bold;
   display: inline-block; 
   width: 0.9em;
   margin-left: -1.1em;
-  margin-right: 3px;
+  margin-right: 16px;
 }
 
 .tit{
