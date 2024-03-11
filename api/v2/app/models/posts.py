@@ -1,6 +1,7 @@
 from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from sqlalchemy.sql import func
 from datetime import datetime
 from app.model import Model
 
@@ -11,7 +12,7 @@ class Post(Model):
     title: Mapped[str] = mapped_column(Text)
     link: Mapped[str] = mapped_column(String(256))
     summary: Mapped[str] = mapped_column(Text())
-    timestamp: Mapped[datetime] = mapped_column(DateTime(), default=datetime.now())
+    timestamp: Mapped[datetime] = mapped_column(DateTime(), server_default=func.now())
 
     def summary_str(self):
         max_size = 32
@@ -26,7 +27,10 @@ class Post(Model):
 if __name__ == "__main__":
     Post.run()
     post = Post(
-        id="teste123", title="Teste de Título", link="https://nucleo.jor.br/garimpo/teste123",  summary="<html>Um teste de corpo</html>"
+        id="teste123",
+        title="Teste de Título",
+        link="https://nucleo.jor.br/garimpo/teste123",
+        summary="<html>Um teste de corpo</html>",
     ).insert()
 
     for p in Post.select():

@@ -28,7 +28,7 @@ async def create(id, title, link, content):
 
 
 async def read(amount=5):
-    posts = Post.select(orderby=Post.timestamp.desc(), limit=5)
+    posts = Post.select(orderby=Post.timestamp.desc(), limit=int(amount))
     content = ""
     for post in posts:
         content += f'<h1>{post.title}</h1><p></p>{post.summary}<p></p><a class="button-tit" href="{post.link}">Quero saber mais</a>'
