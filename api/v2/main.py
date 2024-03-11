@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Header, Request, Response
-from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -51,12 +50,12 @@ async def get():
     return {"Hello": "World"}
 
 
-@app.get("/post/", status_code=200, response_class=HTMLResponse)
+@app.get("/post/", status_code=200)
 async def get_last_posts():
     return await post_controller.read()
 
 
-@app.get("/post/{amount}", status_code=200, response_class=HTMLResponse)
+@app.get("/post/{amount}", status_code=201)
 async def get_posts(amount):
     return await post_controller.read(amount)
 

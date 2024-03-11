@@ -2,6 +2,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from app.models.posts import Post
 import os
+import json
 
 load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -16,7 +17,7 @@ async def create(id, title, link, content):
         messages=[
             {
                 "role": "user",
-                "content": f"Faça um resumo deste texto em 3 bullet points, usando no máximo 20 palavras para cada bullet. Formate os bullets como uma lista em HTML: {content}",
+                "content": f"Faça um resumo deste texto em 3 bullet points, usando no máximo 20 palavras para cada bullet. Formate os bullets como uma lista em Python: {content}",
             }
         ],
         model="gpt-4",
@@ -29,7 +30,13 @@ async def create(id, title, link, content):
 
 async def read(amount=5):
     posts = Post.select(orderby=Post.timestamp.desc(), limit=int(amount))
-    content = ""
+    content = []
     for post in posts:
-        content += f'<h1>{post.title}</h1><p></p>{post.summary}<p></p><a class="button-tit" href="{post.link}">Quero saber mais</a>'
-    return f"<html><head></head><body>{content}</body></html>"
+        content.append(
+            {
+                "title": post.title,
+                "summary": json.loads(post.summary),
+                "link": post.link,
+            }
+        )
+    return content
