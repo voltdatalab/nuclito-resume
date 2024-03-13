@@ -17,7 +17,7 @@ async def create(id, title, link, content):
         messages=[
             {
                 "role": "user",
-                "content": f"Faça um resumo deste texto em 3 bullet points, usando no máximo 20 palavras para cada bullet. Formate os bullets como uma lista em Python: {content}",
+                "content": f"Faça um resumo deste texto em 3 tópicos, usando no máximo 20 palavras para cada tópico. Formate os tópicos como um array JSON: {content}",
             }
         ],
         model="gpt-4",

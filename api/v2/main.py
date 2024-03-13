@@ -55,7 +55,7 @@ async def get_last_posts():
     return await post_controller.read()
 
 
-@app.get("/post/{amount}", status_code=201)
+@app.get("/post/{amount}", status_code=200)
 async def get_posts(amount):
     return await post_controller.read(amount)
 
