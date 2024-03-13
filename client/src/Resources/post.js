@@ -6,7 +6,7 @@ import Card from "react-bootstrap/Card";
 import Button from "react-bootstrap/Button";
 
 const Post = ({ data }) => (
-  <Column xs={12} lg={6} xl={4} className="mb-4">
+  <Column xs={12} md={6} lg={4} xl={3} className="mb-4">
     <Card>
       <h2 className="tit">{data.title}</h2>
       <ul>

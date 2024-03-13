@@ -7,7 +7,7 @@ import Grid from "./Resources/grid";
 function App() {
   const [jsonData, setJsonData] = useState([]);
   const [loading, setLoading] = useState(true); // Add a loading state
-  const amountPerPage = 10;
+  const amountPerPage = 12;
 
   useEffect(() => {
     setLoading(true); // Set loading to true when the component mounts and the fetch starts

@@ -58,13 +58,12 @@ body{
 
 /* Custom card styles */
 .card {
-  background-color: #4b31dd !important; /* Dark blue background */
-  color: white; /* White text */
+  background-color: #eeeeee !important; /* Dark blue background */
   margin-bottom: 20px;
   padding: 20px;
   border-radius: 10px; /* Rounded corners */
   border: 1px solid #f33872; /* Subtle border */
-  box-shadow: 0 5px 9px rgba(0,0,0,0.4); /* Cool box-shadow */
+  box-shadow: 0 5px 9px rgba(0,0,0,0.1); /* Cool box-shadow */
   font-family: "Barlow", sans-serif;
 }
 
@@ -78,18 +77,16 @@ body{
 }
 
 .card ul li {
-  color: #eeeeee;
-  font-weight: bold;
   margin-left: 15px;
   position: relative;
   margin-bottom: 10px;
-  border-bottom: 1px solid #eeeeee;
   padding-bottom: 10px;
   /* padding-left: 10px; */
 }
 
 .card ul li:before {
-  content: '✅'; /* Custom bullet */
+  content: '➜'; /* Custom bullet */
+  color: #4b31dd; /* Button color */
   display: inline-block; 
   width: 0.9em;
   margin-left: -1.1em;
@@ -97,9 +94,8 @@ body{
 }
 
 .tit{
-  color: #eeeeee;
   text-transform: uppercase;
-  font-size: 1.2em;
+  font-size: 1.5em;
   font-weight: 700;
 }
 
@@ -112,7 +108,7 @@ a{
 }
 
 .btn-primary{
-  background-color: #f33872 !important; /* Button color */
+  background-color: #4b31dd !important; /* Button color */
   padding: 7px 12px;
   border-radius: 20px; /* More rounded */
   color: #eeeeee !important; /* White text */
