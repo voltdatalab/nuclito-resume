@@ -6,15 +6,13 @@ import Card from "react-bootstrap/Card";
 import Button from "react-bootstrap/Button";
 
 const Post = ({ data }) => (
-  <Column xs={12} md={6} lg={4} xl={3} className="mb-4">
-    <Card>
-      <h2 className="tit">{data.title}</h2>
-      <ul>
-        {data.summary.map((item, index) => <li key={index}>{item}</li>)}
-      </ul>
-      <Button href={data.link} className="button-tit">Quero saber mais</Button>
-    </Card>
-  </Column>
+  <Card>
+    <h2 className="tit">{data.title}</h2>
+    <ul>
+      {data.summary.map((item, index) => <li key={index}>{item}</li>)}
+    </ul>
+    <Button href={data.link} className="button-tit">Quero saber mais</Button>
+  </Card>
 );
 
 export default Post;

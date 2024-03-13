@@ -1,16 +1,23 @@
 import React from "react";
 import "../App.css";
 import Post from "./post";
+import Masonry from "react-masonry-css";
 
-import Container from "react-bootstrap/Container";
-import Row from "react-bootstrap/Row";
+const breakpointColumns = {
+  default: 4,
+  1200: 3,
+  960: 2,
+  700: 1,
+};
 
 const Grid = ({ posts }) => (
-  <Container>
-    <Row className="g-3">
-      {posts.map((post) => <Post data={post} />)}
-    </Row>
-  </Container>
+  <Masonry
+    breakpointCols={breakpointColumns}
+    className="masonry-grid"
+    columnClassName="masonry-column"
+  >
+    {posts.map((post) => <Post data={post} />)}
+  </Masonry>
 );
 
 export default Grid;

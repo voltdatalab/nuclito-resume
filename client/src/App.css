@@ -1,9 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;700&display=swap');
 
-body{
-  background-color: #eeeeee;
-}
-
 .App{
   text-align: left;
 }
@@ -121,4 +117,13 @@ a{
   color: #003366 !important; /* Text color change on hover */
 }
 
+.masonry-grid{
+  display: flex;
+  margin-left: -30px;
+  width: auto;
+}
 
+.masonry-column{
+  padding-left: 30px;
+  background-clip: padding-box;
+}

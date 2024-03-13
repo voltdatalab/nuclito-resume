@@ -3,6 +3,7 @@ import axios from "axios";
 import "./App.css";
 import Spinner from "./Resources/spinner"; // Make sure this path is correct
 import Grid from "./Resources/grid";
+import { Helmet } from "react-helmet";
 
 function App() {
   const [jsonData, setJsonData] = useState([]);
@@ -24,6 +25,9 @@ function App() {
 
   return (
     <div className="App">
+      <Helmet>
+        <style>{"body { background-color: #eeeeee; }"}</style>
+      </Helmet>
       {loading
         ? <Spinner message="Carregando um caminhão de magia..." />
         : <Grid posts={jsonData} />}
