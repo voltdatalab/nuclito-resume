@@ -39,7 +39,7 @@ async def read(amount=5):
                 "title": post.title,
                 "summary": json.loads(post.summary),
                 "link": post.link,
-                "date": post.timestamp.strftime("%d.%B.%Y"),
+                "date": post.timestamp.strftime("%d.%b.%Y"),
             }
         )
     return content
