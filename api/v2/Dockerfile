@@ -5,7 +5,16 @@ COPY . .
 
 RUN apk update \
     && apk add --virtual build-deps gcc python3-dev musl-dev \
-    && apk add --no-cache mariadb-dev
+    && apk add --no-cache mariadb-dev musl musl-utils musl-locales
+
+RUN cp /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
+RUN echo "America/Sao_Paulo" > /etc/timezone
+
+ENV TZ America/Sao_Paulo
+ENV LANG pt_BR.UTF-8
+ENV LANGUAGE pt_BR.UTF-8
+ENV LC_ALL pt_BR.UTF-8
+ENV MUSL_LOCPATH /usr/share/i18n/locales/musl
     
 RUN pip install -r /app/requirements.txt
 

@@ -3,7 +3,9 @@ from dotenv import load_dotenv
 from app.models.posts import Post
 import os
 import json
+import locale
 
+locale.setlocale(locale.LC_ALL, '')
 load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -37,7 +39,7 @@ async def read(amount=5):
                 "title": post.title,
                 "summary": json.loads(post.summary),
                 "link": post.link,
-                "date": post.timestamp.strftime("%d.%b.%Y").lower(),
+                "date": post.timestamp.strftime("%d.%B.%Y"),
             }
         )
     return content
