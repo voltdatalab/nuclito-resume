@@ -1,13 +1,13 @@
 import React from "react";
 import "../App.css";
 
-import Column from "react-bootstrap/Col";
 import Card from "react-bootstrap/Card";
 import Button from "react-bootstrap/Button";
 
 const Post = ({ data }) => (
   <Card>
     <h2 className="tit">{data.title}</h2>
+    <span className="data-bullet">{data.date}</span>
     <ul>
       {data.summary.map((item, index) => <li key={index}>{item}</li>)}
     </ul>
