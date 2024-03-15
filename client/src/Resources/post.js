@@ -1,7 +1,6 @@
 import React from "react";
 import "../App.css";
 
-import Column from "react-bootstrap/Col";
 import Card from "react-bootstrap/Card";
 import Button from "react-bootstrap/Button";
 

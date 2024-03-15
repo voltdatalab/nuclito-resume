@@ -4,8 +4,7 @@ import Post from "./post";
 import Masonry from "react-masonry-css";
 
 const breakpointColumns = {
-  default: 4,
-  1200: 3,
+  default: 3,
   960: 2,
   700: 1,
 };
