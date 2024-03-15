@@ -11,6 +11,7 @@
     "cors": "^2.8.5",
     "react": "^18.2.0",
     "react-bootstrap": "^2.10.1",
+    "react-build-dist": "^0.0.8",
     "react-dom": "^18.2.0",
     "react-helmet": "^6.1.0",
     "react-masonry-css": "^1.0.16",
@@ -20,6 +21,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:dist": "react-build-dist",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
