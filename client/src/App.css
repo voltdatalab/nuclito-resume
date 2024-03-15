@@ -55,7 +55,7 @@
 /* Custom card styles */
 .card {
   background-color: #eeeeee !important; /* Dark blue background */
-  margin-bottom: 20px;
+  margin: 15px;
   padding: 20px;
   border-radius: 10px; /* Rounded corners */
   border: 1px solid #f33872; /* Subtle border */
@@ -77,7 +77,6 @@
   position: relative;
   margin-bottom: 10px;
   padding-bottom: 10px;
-  /* padding-left: 10px; */
 }
 
 .card ul li:before {
@@ -120,10 +119,26 @@ a{
 .masonry-grid{
   display: flex;
   margin-left: -30px;
+  padding-left: 30px;
   width: auto;
 }
 
 .masonry-column{
-  padding-left: 30px;
   background-clip: padding-box;
+}
+
+.slick-slider{
+  margin: 20px;
+}
+
+.tutorial{
+  padding-top: 20px;
+  text-align: center;
+  font-size: 1.5em;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.tutorial-arrow{
+  color: #4b31dd;
 }
