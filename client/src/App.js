@@ -9,7 +9,7 @@ import { Helmet } from "react-helmet";
 function App() {
   const [jsonData, setJsonData] = useState([]);
   const [loading, setLoading] = useState(true); // Add a loading state
-  const amountPerPage = 12;
+  const amountPerPage = 15;
   const mobileMaxWidth = 700;
   const [isMobile, setIsMobile] = useState(window.innerWidth < mobileMaxWidth);
 
