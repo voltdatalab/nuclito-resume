@@ -24,7 +24,7 @@ Para uso em produção, use a versão 2.0.
 #### INSTALA OPENAI
 `npm install openai`
 
-### PACOTE PARA DEPENDENCIAS
+#### PACOTE PARA DEPENDENCIAS
 `npm install dotenv`
 
 #### COMANDO ÚNICO
