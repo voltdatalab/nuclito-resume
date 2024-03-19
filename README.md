@@ -39,7 +39,11 @@ python main.py
 
 
 ## ESTRUTURA
-O projeto consiste de um *client* front-end feito em [React.js](https://react.dev/) e uma API de conteúdo, para a qual foram feitas duas versões: `v1` em [Express.js](https://expressjs.com) e `v2` feita em [FastAPI](https://fastapi.tiangolo.com/). A versão v1 foi abandonada e não apresenta nenhum mecanismo por gerar os resumos novamente a cada requisição, enquanto a v2 salva os resumos gerados em um banco de dados. A estrutura do repositório é a seguinte:
+O projeto consiste de um *client* front-end feito em [React.js](https://react.dev/) e uma API de conteúdo, para a qual foram feitas duas versões: `v1` em [Express.js](https://expressjs.com) e `v2` feita em [FastAPI](https://fastapi.tiangolo.com/). 
+
+A versão v1 serviu como prova de conceito da aplicação e não é para ser usada em produção por gerar uma requisição à API da OpenAI toda vez que a página da aplicação é recarregada, enquanto a v2 salva os resumos gerados em um banco de dados, o que aumenta a eficiência e reduz os custos. 
+
+A estrutura do repositório é a seguinte:
 ```
 api/
 |- v1/
