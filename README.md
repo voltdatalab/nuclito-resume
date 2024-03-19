@@ -30,4 +30,3 @@ Após incluídas as variáveis de ambiente:
 
 * /server: `node index.js`
 * /client: `npm run start`
-
