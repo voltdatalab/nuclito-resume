@@ -1,5 +1,7 @@
 # Nuclito Resume
-### Usando ChatGPT para sumarizar os posts do [Núcleo Jornalismo](https://nucleo.jor.br/)
+Usando ChatGPT para sumarizar os posts do [Núcleo Jornalismo](https://nucleo.jor.br/)
+
+Distribuído sob a licença MIT [mais detalhes aqui](https://github.com/voltdatalab/nuclito-resume/tree/main?tab=MIT-1-ov-file)
 
 ## INSTALAÇÃO E INICIALIZAÇÃO
 
