@@ -41,7 +41,7 @@ class Model(DeclarativeBase):
         print("migration successful!")
 
     @classmethod
-    def select(cls, whereclause=None, orderby=None, limit=None):
+    def select(cls, whereclause=None, orderby=None, limit=None, offset=None):
         result = select(cls)
         if whereclause is not None:
             result = result.where(whereclause)
@@ -49,6 +49,8 @@ class Model(DeclarativeBase):
             result = result.order_by(orderby)
         if limit is not None:
             result = result.limit(limit)
+        if offset is not None:
+            result = result.offset(offset)
 
         with Session(engine) as session:
             result = list(session.scalars(result))

@@ -15,7 +15,9 @@ function App() {
 
   useEffect(() => {
     setLoading(true); // Set loading to true when the component mounts and the fetch starts
-    axios.get(process.env.REACT_APP_API_URL + "/post/" + amountPerPage)
+    axios.get(process.env.REACT_APP_API_URL + "/post/", {
+      params: { page: 0, amount: amountPerPage },
+    })
       .then((response) => {
         setJsonData(response.data); // Update state with the HTML content
         setLoading(false); // Set loading to false once data is received

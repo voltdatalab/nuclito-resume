@@ -5,7 +5,7 @@ import os
 import json
 import locale
 
-locale.setlocale(locale.LC_ALL, '')
+locale.setlocale(locale.LC_ALL, "")
 load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -30,8 +30,10 @@ async def create(id, title, link, content):
     return Post(id=id, title=title, link=link, summary=summary).insert()
 
 
-async def read(amount=5):
-    posts = Post.select(orderby=Post.timestamp.desc(), limit=int(amount))
+async def read(page=0, amount=5):
+    limit = int(amount)
+    offset = int(page) * limit
+    posts = Post.select(orderby=Post.timestamp.desc(), limit=limit, offset=offset)
     content = []
     for post in posts:
         content.append(
