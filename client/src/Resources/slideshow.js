@@ -14,7 +14,7 @@ const settings = {
 const SlideShow = ({ posts }) => (
   <div>
     <p className="tutorial">
-      Arraste para o lado&ensp;<i class="fa-regular fa-hand-point-right"></i>
+      Arraste para o lado&ensp;<i className="fa-regular fa-hand-point-right"></i>
     </p>
     <Slider {...settings}>
       {posts.map((post) => <Post data={post} />)}
