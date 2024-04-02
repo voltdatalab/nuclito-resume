@@ -25,13 +25,14 @@ function App() {
       params: { page: page, amount: amountPerPage },
     })
       .then((response) => {
-        setJsonData((prevData) => [...prevData, ...response.data]); // Update state with the HTML content
+        setJsonData((prevData) => [...prevData, ...response.data]); // Update state with the JSON content
         setPage((prevPage) => prevPage + 1);
+        setLoading(false);
       })
       .catch((error) => {
         console.error("There was an error!", error);
-      })
-      .finally(setLoading(false)); // Also set loading to false if there's an error
+        setLoading(false); // Also set loading to false if there's an error
+      });
   };
 
   useEffect(() => {
