@@ -11,9 +11,14 @@ function App() {
   const [jsonData, setJsonData] = useState([]);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true); // Add a loading state
+
   const amountPerPage = 6;
   const mobileMaxWidth = 700;
   const [isMobile, setIsMobile] = useState(window.innerWidth < mobileMaxWidth);
+
+  const lang = process.env.REACT_APP_LANGUAGE
+    ? process.env.REACT_APP_LANGUAGE
+    : "pt_BR";
 
   const fetchJsonData = () => {
     axios.get(process.env.REACT_APP_API_URL + "/post/", {
@@ -49,21 +54,19 @@ function App() {
       <Helmet>
         <style>{"body { background-color: #eeeeee; }"}</style>
       </Helmet>
-      {loading
-        ? <Spinner message="Carregando um caminhão de magia..." />
-        : (
-          <div>
-            {isMobile
-              ? <SlideShow posts={jsonData} />
-              : <Grid posts={jsonData} />}
-            <Button
-              onClick={() => fetchJsonData(page)}
-              disabled={loading}
-            >
-              Carregar mais
-            </Button>
-          </div>
-        )}
+      {loading ? <Spinner lang={lang} /> : (
+        <div>
+          {isMobile
+            ? <SlideShow posts={jsonData} lang={lang} />
+            : <Grid posts={jsonData} lang={lang} />}
+          <Button
+            onClick={() => fetchJsonData(page)}
+            disabled={loading}
+          >
+            {lang === "pt_BR" ? "Carregar mais" : "Load more"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,13 +11,14 @@ const settings = {
   slidesToScroll: 1,
 };
 
-const SlideShow = ({ posts }) => (
+const SlideShow = ({ posts, lang }) => (
   <div>
     <p className="tutorial">
-      Arraste para o lado&ensp;<i className="fa-regular fa-hand-point-right"></i>
+      {lang === "pt_BR" ? "Arraste para o lado\t" : "Swipe left\t"}
+      <i className="fa-regular fa-hand-point-right"></i>
     </p>
     <Slider {...settings}>
-      {posts.map((post) => <Post data={post} />)}
+      {posts.map((post) => <Post data={post} lang={lang} />)}
     </Slider>
   </div>
 );

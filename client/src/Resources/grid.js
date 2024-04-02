@@ -9,13 +9,13 @@ const breakpointColumns = {
   700: 1,
 };
 
-const Grid = ({ posts }) => (
+const Grid = ({ posts, lang }) => (
   <Masonry
     breakpointCols={breakpointColumns}
     className="masonry-grid"
     columnClassName="masonry-column"
   >
-    {posts.map((post) => <Post data={post} />)}
+    {posts.map((post) => <Post data={post} lang={lang} />)}
   </Masonry>
 );
 
