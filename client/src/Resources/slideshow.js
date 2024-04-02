@@ -16,7 +16,7 @@ const settings = {
 const SlideShow = ({ posts, lang }) => (
   <div>
     <p className="tutorial">
-      {lang === "pt_BR" ? "Arraste para o lado\t" : "Swipe left\t"}
+      {lang === "pt_BR" ? "Arraste para o lado\t" : "Swipe right\t"}
       <FontAwesomeIcon icon={faHandPointRight} />
     </p>
     <Slider {...settings}>
