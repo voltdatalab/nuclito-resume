@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 
 .App{
-  text-align: left;
+  text-align: left !important;
 }
 
 .App-header {
@@ -54,12 +55,12 @@
 
 /* Custom card styles */
 .card {
-  background-color: #eeeeee !important; /* Dark blue background */
-  margin: 15px;
+  background-color: #eeeeee !important;
+  margin-bottom: 20px;
   padding: 20px;
   border-radius: 10px; /* Rounded corners */
-  border: 1px solid #f33872; /* Subtle border */
-  box-shadow: 0 5px 9px rgba(0,0,0,0.1); /* Cool box-shadow */
+  border-top: 5px solid #3d2dd7 !important;
+  box-shadow: 0 5px 9px rgba(0, 0, 0, 0.4) !important;
   font-family: "Barlow", sans-serif;
 }
 
@@ -77,6 +78,7 @@
   position: relative;
   margin-bottom: 10px;
   padding-bottom: 10px;
+  font-size: 0.8em;
 }
 
 .card ul li:before {
@@ -84,13 +86,13 @@
   color: #4b31dd; /* Button color */
   display: inline-block; 
   width: 0.9em;
-  margin-left: -1.1em;
+  margin-left: -1.9em;
   margin-right: 16px;
 }
 
 .tit{
   text-transform: uppercase;
-  font-size: 1.5em;
+  font-size: 1em !important;
   font-weight: 700;
 }
 
@@ -100,6 +102,7 @@ li, p {
 
 a{
   text-decoration: none;
+  color: #231f20;
 }
 
 .btn-primary{
@@ -109,6 +112,7 @@ a{
   color: #eeeeee !important; /* White text */
   border: none; /* Remove border */
   cursor: pointer; /* Cursor effect on hover */
+  font-size: 1em;
 }
 
 .btn-primary:hover{
@@ -119,11 +123,11 @@ a{
 .masonry-grid{
   display: flex;
   margin-left: -30px;
-  padding-left: 30px;
   width: auto;
 }
 
 .masonry-column{
+  padding-left: 30px !important;
   background-clip: padding-box;
 }
 
@@ -139,6 +143,12 @@ a{
   font-weight: bold;
 }
 
-.tutorial-arrow{
-  color: #4b31dd;
+.data-bullet{
+    font-size: 0.6em;
+    font-family: 'Roboto Mono';
+    margin-bottom: 15px;
+    color: #4b31dd;
+    border-bottom: 1px solid #cbcbcb;
+    padding-bottom: 10px;
+    text-align: right;
 }
