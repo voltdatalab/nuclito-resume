@@ -16,5 +16,6 @@ ENV REACT_APP_LANGUAGE pt_BR
 
 RUN npm run build
 RUN MAIN_JS=$(ls build/static/js/main.*.js | cut -d'/' -f4) && ln -s $MAIN_JS build/static/js/main.js
+RUN MAIN_CSS=$(ls build/static/css/main.*.css | cut -d'/' -f4) && ln -s $MAIN_CSS build/static/css/main.css
 
 CMD ["serve", "-n", "-S", "build"]
