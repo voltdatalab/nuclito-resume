@@ -11,7 +11,7 @@ ENV NODE_ENV production
 RUN npm install
 RUN npm install -g serve
 
-ENV REACT_APP_API_URL http://localhost:8080
+ARG REACT_APP_API_URL
 ENV REACT_APP_LANGUAGE pt_BR
 
 RUN npm run build
