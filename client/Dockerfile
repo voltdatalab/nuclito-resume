@@ -14,6 +14,7 @@ RUN npm install -g serve
 ENV REACT_APP_API_URL http://localhost:8080
 ENV REACT_APP_LANGUAGE pt_BR
 
-RUN npm run build:dist
+RUN npm run build
+RUN MAIN_JS=$(ls build/static/js/main.*.js | cut -d'/' -f4) && ln -s $MAIN_JS build/static/js/main.js
 
-CMD ["serve", "-p", "80", "dist"]
+CMD ["serve", "-n", "-S", "build"]
