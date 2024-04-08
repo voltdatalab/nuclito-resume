@@ -4,7 +4,6 @@ import "./App.css";
 import Spinner from "./Resources/spinner"; // Make sure this path is correct
 import Grid from "./Resources/grid";
 import SlideShow from "./Resources/slideshow";
-import { Helmet } from "react-helmet";
 import { Button } from "react-bootstrap";
 
 function App() {
@@ -52,9 +51,6 @@ function App() {
 
   return (
     <div className="App">
-      <Helmet>
-        <style>{"body { background-color: #eeeeee; }"}</style>
-      </Helmet>
       {loading ? <Spinner lang={lang} /> : (
         <div>
           {isMobile
