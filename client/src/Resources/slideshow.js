@@ -2,6 +2,8 @@ import React from "react";
 import "../App.css";
 import Post from "./post";
 import Slider from "react-slick";
+import { faHandPointRight } from "@fortawesome/free-regular-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const settings = {
   dots: true,
@@ -11,13 +13,14 @@ const settings = {
   slidesToScroll: 1,
 };
 
-const SlideShow = ({ posts }) => (
+const SlideShow = ({ posts, lang }) => (
   <div>
     <p className="tutorial">
-      Arraste para o lado&ensp;<i class="fa-regular fa-hand-point-right"></i>
+      {lang === "pt_BR" ? "Arraste para o lado\t" : "Swipe right\t"}
+      <FontAwesomeIcon icon={faHandPointRight} />
     </p>
     <Slider {...settings}>
-      {posts.map((post) => <Post data={post} />)}
+      {posts.map((post) => <Post data={post} lang={lang} />)}
     </Slider>
   </div>
 );

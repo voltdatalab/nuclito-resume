@@ -51,13 +51,8 @@ async def get():
 
 
 @app.get("/post/", status_code=200)
-async def get_last_posts():
-    return await post_controller.read()
-
-
-@app.get("/post/{amount}", status_code=200)
-async def get_posts(amount):
-    return await post_controller.read(amount)
+async def get_posts(page: int = 0, amount: int = 6):
+    return await post_controller.read(page, amount)
 
 
 @app.post("/post/", status_code=204)
@@ -104,7 +99,7 @@ async def post(
     content = post_data["plaintext"]
     primary_tag = post_data["primary_tag"]["slug"]
 
-    if (not primary_tag.endswith("news")):
+    if not primary_tag.endswith("news"):
         await post_controller.create(id, title, link, content)
 
 
