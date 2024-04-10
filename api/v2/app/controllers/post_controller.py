@@ -79,9 +79,13 @@ async def read(page=0, amount=5):
         content.append(
             {
                 "title": post.title,
-                "title_en": post.title_en,
+                "title_en": post.title_en if post.title_en else post.title,
                 "summary": json.loads(post.summary),
-                "summary_en": json.loads(post.summary_en),
+                "summary_en": (
+                    json.loads(post.summary_en)
+                    if post.summary_en
+                    else ["No summary in English available"]
+                ),
                 "link": post.link,
                 "date": post.timestamp.strftime("%d.%b.%Y"),
             }
