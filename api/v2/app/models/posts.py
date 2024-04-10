@@ -10,10 +10,10 @@ class Post(Model):
     __tablename__ = "posts"
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     title: Mapped[str] = mapped_column(Text)
-    title_en: Mapped[str] = mapped_column(Text)
+    title_en: Mapped[str] = mapped_column(Text, nullable=True)
     link: Mapped[str] = mapped_column(String(256))
     summary: Mapped[str] = mapped_column(Text())
-    summary_en: Mapped[str] = mapped_column(Text())
+    summary_en: Mapped[str] = mapped_column(Text(), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(), server_default=func.now())
 
     def summary_str(self):
