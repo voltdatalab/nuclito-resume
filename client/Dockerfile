@@ -12,7 +12,7 @@ RUN npm install
 RUN npm install -g serve
 
 ARG REACT_APP_API_URL
-ENV REACT_APP_LANGUAGE pt_BR
+ARG REACT_APP_LANGUAGE
 
 RUN npm run build
 RUN MAIN_JS=$(ls build/static/js/main.*.js | cut -d'/' -f4) && ln -s $MAIN_JS build/static/js/main.js
