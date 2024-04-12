@@ -4,6 +4,15 @@ from app.models.posts import Post
 import os
 import json
 import locale
+import re
+
+
+def is_valid_json_array(arraystr: str) -> bool:
+    return (
+        re.match(r"""^\[[\n ]?(\t?".*",[\n ]?){2}\t?".*"[\n ]?\]$""", arraystr)
+        is not None
+    )
+
 
 locale.setlocale(locale.LC_ALL, "")
 load_dotenv()
@@ -19,12 +28,10 @@ async def query_gpt_json(query: str, max_tries: int = 5):
         )
 
         for choice in chat_completion.choices:
-            try:
-                summary = choice.message.content
-                json.loads(summary)
+            summary = choice.message.content
+            print(f"Generated summary: {summary}")
+            if is_valid_json_array(summary):
                 return summary
-            except json.JSONDecodeError:
-                continue
     return ""
 
 
@@ -45,7 +52,7 @@ async def create(id, title, link, content):
 
     # Generate summary in Portuguese
     summary = await query_gpt_json(
-        f"Faça um resumo deste texto em 3 tópicos, usando no máximo 30 palavras para cada tópico. Formate os tópicos como um array JSON: {content}"
+        f"Faça um resumo deste texto em 3 tópicos, usando no máximo 30 palavras para cada tópico. Formate os tópicos como um array de strings em JavaScript: {content}"
     )
 
     # Translate the summary to English
