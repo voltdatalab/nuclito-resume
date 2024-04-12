@@ -9,7 +9,7 @@ import re
 
 def is_valid_json_array(arraystr: str) -> bool:
     return (
-        re.match(r"""^\[[\n ]?(\t?".*",[\n ]?){2}\t?".*"[\n ]?\]$""", arraystr)
+        re.match(r"""^\[[\n ]?(\t?"[^\"]*",[\n ]?){2}\t?"[^\"]*"[\n ]?\]$""", arraystr)
         is not None
     )
 
