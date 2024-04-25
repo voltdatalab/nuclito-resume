@@ -38,7 +38,7 @@ app.add_middleware(
 )
 
 logger = logging.getLogger(APP_NAME)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(levelname)s:\t%(message)s")
 file_logging = logging.StreamHandler()
 file_logging.setFormatter(formatter)
