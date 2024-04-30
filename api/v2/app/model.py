@@ -1,5 +1,5 @@
 from sqlalchemy.orm import DeclarativeBase, Session
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, exc
 from sqlalchemy import URL
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -19,9 +19,14 @@ url_object = URL.create(
 
 pool_size = int(os.getenv("DB_POOL_SIZE", 20))
 max_overflow = int(os.getenv("DB_MAX_OVERFLOW", 0))
+pool_recycle = int(os.getenv("DB_POOL_RECYCLE", 300))
 
 engine = create_engine(
-    url_object, echo=True, pool_size=pool_size, max_overflow=max_overflow
+    url_object,
+    echo=True,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_recycle=pool_recycle,
 )
 
 
@@ -29,8 +34,15 @@ class Model(DeclarativeBase):
     def insert(self):
         try:
             with Session(engine) as session:
-                session.add(self)
-                session.commit()
+                try:
+                    session.add(self)
+                    session.commit()
+                except exc.DBAPIError as e:
+                    if e.connection_invalidated:
+                        # Try again. If the error happens again, than something
+                        # is very wrong
+                        session.add(self)
+                        session.commit()
         except IntegrityError:
             pass
 
@@ -53,5 +65,11 @@ class Model(DeclarativeBase):
             result = result.offset(offset)
 
         with Session(engine) as session:
-            result = list(session.scalars(result))
+            try:
+                result = list(session.scalars(result))
+            except exc.DBAPIError as e:
+                if e.connection_invalidated:
+                    # Try again. If the error happens again, than something is
+                    # very wrong
+                    result = list(session.scalars(result))
         return result
