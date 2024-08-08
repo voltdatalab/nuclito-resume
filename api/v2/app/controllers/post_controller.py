@@ -24,7 +24,7 @@ async def query_gpt_json(query: str, max_tries: int = 5):
     for _ in range(max_tries):
         chat_completion = openai_client.chat.completions.create(
             messages=[{"role": "user", "content": query}],
-            model="gpt-4",
+            model="gpt-4o",
         )
 
         for choice in chat_completion.choices:
@@ -38,7 +38,7 @@ async def query_gpt_json(query: str, max_tries: int = 5):
 async def query_gpt_str(query: str):
     chat_completion = openai_client.chat.completions.create(
         messages=[{"role": "user", "content": query}],
-        model="gpt-4",
+        model="gpt-4o",
     )
 
     return chat_completion.choices[0].message.content

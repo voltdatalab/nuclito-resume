@@ -69,7 +69,7 @@ async function summarizeContent(content) {
   try {
     const response = await openai.chat.completions.create({
       messages: [{ role: 'user', content: `Faça um resumo deste texto em 3 bullet points, usando no máximo 20 palavras para cada bullet. Formate os bullets como uma lista em HTML: ${content}` }],
-      model: 'gpt-4',
+      model: 'gpt-4o',
     });
     // Assuming the API returns a structure where the summary can be accessed like this:
     // This path may need adjustment based on the actual API response structure.
