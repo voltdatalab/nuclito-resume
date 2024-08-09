@@ -7,11 +7,13 @@ import locale
 import re
 
 
-def is_valid_json_array(arraystr: str) -> bool:
-    return (
-        re.match(r"""^\[[\n ]?(\t?"[^\"]*",[\n ]?){2}\t?"[^\"]*"[\n ]?\]$""", arraystr)
-        is not None
+def get_valid_json_array(arraystr: str) -> str:
+    match = re.search(
+        r"""(\[[\n ]*(\t?"[^\"]*",[\n ]*){2}\t?"[^\"]*"[\n ]*\])""", arraystr
     )
+    if match:
+        return match.group(1)
+    return None
 
 
 locale.setlocale(locale.LC_ALL, "")
@@ -29,10 +31,13 @@ async def query_gpt_json(query: str, max_tries: int = 5):
 
         for choice in chat_completion.choices:
             summary = choice.message.content
-            print(f"Generated summary: {summary}")
-            if is_valid_json_array(summary):
-                return summary
-    return ""
+            print(f"Received summary: {summary}")
+            json_summary = get_valid_json_array(summary)
+            print(f"Valid summary: {json_summary}")
+            if json_summary is not None:
+                return json_summary
+
+    raise Exception("Summary not generated")
 
 
 async def query_gpt_str(query: str):
@@ -52,16 +57,16 @@ async def create(id, title, link, content):
 
     # Generate summary in Portuguese
     summary = await query_gpt_json(
-        f"Faça um resumo deste texto em 3 tópicos, usando no máximo 30 palavras para cada tópico. Formate os tópicos como um array de strings em JavaScript: {content}"
+        f"Faça um resumo deste texto em 3 tópicos, usando no máximo 30 palavras para cada tópico. Formate os tópicos como um array de strings em JavaScript, e retorne apenas o array, sem nenhuma formatação: {content}"
     )
 
     # Translate the summary to English
     summary_en = await query_gpt_json(
-        f"Traduza o array JSON a seguir de português para inglês e retorne um novo array JSON: {summary}"
+        f"Traduza o array JSON a seguir de português para inglês e retorne um novo array JSON. Retorne apenas o array, sem nenhuma formatação: {summary}"
     )
 
     title_en = await query_gpt_str(
-        f"Traduza o título a seguir de português para inglês: {title}"
+        f"Traduza o título a seguir de português para inglês. Retorne apenas o texto do título: {title}"
     )
 
     # Insert in database
