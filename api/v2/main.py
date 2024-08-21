@@ -55,7 +55,7 @@ async def get_posts(page: int = 0, amount: int = 6):
     return await post_controller.read(page, amount)
 
 
-@app.get("/post/{id}/", status_code=200)
+@app.get("/post/{id}", status_code=200)
 async def get_post(id: str, response: Response):
     post = await post_controller.get(id)
     if post is None:
