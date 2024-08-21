@@ -38,7 +38,7 @@ app.add_middleware(
 )
 
 logger = logging.getLogger(APP_NAME)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(levelname)s:\t%(message)s")
 file_logging = logging.StreamHandler()
 file_logging.setFormatter(formatter)
@@ -77,20 +77,22 @@ async def post(
         response.status_code = 400
         return {"result": "Invalid message signature"}
 
-    raw_input = await request.body()
-    input_hmac = hmac.new(
-        key=os.getenv("WEBHOOK_SECRET").encode(), msg=raw_input, digestmod="sha256"
-    )
-
-    hmac_header_search = re.search("sha256=(.*), t=[0-9]*", x_ghost_signature)
+    hmac_header_search = re.search("sha256=(.*), t=([0-9]*)", x_ghost_signature)
     if not hmac_header_search:
         logger.error(
-            f"Invalid message signature. Expected token in format 'sha256=(.*) t=[0-9]*' but got {x_ghost_signature}"
+            f"Invalid message signature. Expected token in format 'sha256=.*, t=[0-9]*' but got {x_ghost_signature}"
         )
         response.status_code = 401
         return {"result": "Invalid message signature"}
 
-    sha256 = hmac_header_search.group(1)
+    sha256, timestamp = hmac_header_search.group(1, 2)
+
+    raw_input = await request.body()
+    input_hmac = hmac.new(
+        key=os.getenv("WEBHOOK_SECRET").encode(),
+        msg=raw_input + timestamp.encode(),
+        digestmod="sha256",
+    )
 
     if not hmac.compare_digest(input_hmac.hexdigest(), sha256):
         logger.error(
