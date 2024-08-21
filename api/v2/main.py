@@ -55,6 +55,15 @@ async def get_posts(page: int = 0, amount: int = 6):
     return await post_controller.read(page, amount)
 
 
+@app.get("/post/{id}/", status_code=200)
+async def get_post(id: str, response: Response):
+    post = await post_controller.get(id)
+    if post is None:
+        response.status_code = 404
+        return {"result": "Post does not exist"}
+    return post
+
+
 @app.post("/post/", status_code=204)
 async def post(
     webhook_input: WebhookData,

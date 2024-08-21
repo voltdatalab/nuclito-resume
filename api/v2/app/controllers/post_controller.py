@@ -98,3 +98,16 @@ async def read(page=0, amount=5):
             }
         )
     return content
+
+
+async def get(id: str):
+    post_list = Post.select(whereclause=(Post.id == id))
+    if post_list is None or len(post_list) == 0:
+        return None
+
+    post = post_list[0]
+
+    return {
+        "summary": json.loads(post.summary) if post.summary else None,
+        "summary_en": json.loads(post.summary_en) if post.summary_en else None,
+    }
