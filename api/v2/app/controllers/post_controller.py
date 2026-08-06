@@ -19,6 +19,7 @@ def get_valid_json_array(arraystr: str) -> str:
 locale.setlocale(locale.LC_ALL, "")
 load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai_model = os.getenv("OPENAI_MODEL", "gpt-5-nano")
 
 
 # Try generating summaries until GPT-4 returns a valid JSON array
@@ -26,7 +27,7 @@ async def query_gpt_json(query: str, max_tries: int = 5):
     for _ in range(max_tries):
         chat_completion = openai_client.chat.completions.create(
             messages=[{"role": "user", "content": query}],
-            model="gpt-4o-mini",
+            model=openai_model,
         )
 
         for choice in chat_completion.choices:
@@ -43,7 +44,7 @@ async def query_gpt_json(query: str, max_tries: int = 5):
 async def query_gpt_str(query: str):
     chat_completion = openai_client.chat.completions.create(
         messages=[{"role": "user", "content": query}],
-        model="gpt-4o-mini",
+        model=openai_model,
     )
 
     return chat_completion.choices[0].message.content
