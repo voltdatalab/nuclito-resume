@@ -1,0 +1,9 @@
+# Dependências de testes offline; sem mysqlclient. SDK usa apenas MockTransport.
+pytest==9.1.1
+SQLAlchemy==2.0.55
+fastapi==0.156.1
+starlette==1.7.0
+python-dotenv==1.2.4
+httpx==0.28.1
+httpx2==2.14.0
+openai==3.35.1

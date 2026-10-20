@@ -1,48 +1,24 @@
-from fastapi import FastAPI, Header, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from dotenv import load_dotenv
-from app.controllers import post_controller
+from app.publication_sync import Inbox, Rejected, authenticate, normalize
 import os
-import hmac
-import logging
-import json
-import re
 
 load_dotenv()
-
-
-class WebhookResponse(BaseModel):
-    result: str
-
-
-class WebhookData(BaseModel):
-    post: dict
-
-
 APP_NAME = os.getenv("APP_NAME", "nuclito-responde.api.v2")
-
 app = FastAPI(
     title=APP_NAME,
     description="API com os dados de resumos de reportagens gerados pelo Nuclito",
     version="2.0",
 )
-
-origins = os.getenv("CORS_ALLOWED_ORIGINS", "*").split()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "*").split(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-logger = logging.getLogger(APP_NAME)
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(levelname)s:\t%(message)s")
-file_logging = logging.StreamHandler()
-file_logging.setFormatter(formatter)
-logger.addHandler(file_logging)
 
 
 @app.get("/", status_code=200)
@@ -51,78 +27,78 @@ async def get():
 
 
 @app.get("/post/", status_code=200)
-async def get_posts(page: int = 0, amount: int = 6):
+async def get_posts(request: Request, page: int = 0, amount: int = 6):
+    if os.getenv('PUBLICATION_SYNC_ENABLED') == '1':
+        if page < 0 or not 1 <= amount <= 100:
+            return Response(status_code=400)
+        try:
+            inbox = getattr(request.app.state, 'publication_inbox', None) or publication_inbox()
+            return await run_in_threadpool(inbox.read_verified, page=page, amount=amount)
+        except Exception:
+            return Response(status_code=503)
+    from app.controllers import post_controller
     return await post_controller.read(page, amount)
 
 
 @app.get("/post/{id}", status_code=200)
-async def get_post(id: str, response: Response):
-    post = await post_controller.get(id)
+async def get_post(id: str, response: Response, request: Request):
+    if os.getenv('PUBLICATION_SYNC_ENABLED') == '1':
+        import re
+        if not re.fullmatch(r'[0-9a-f]{24}', id):
+            return Response(status_code=404)
+        try:
+            inbox = getattr(request.app.state, 'publication_inbox', None) or publication_inbox()
+            post = await run_in_threadpool(inbox.read_verified, identity=id)
+        except Exception:
+            return Response(status_code=503)
+    else:
+        from app.controllers import post_controller
+        post = await post_controller.get(id)
     if post is None:
         response.status_code = 404
         return {"result": "Post does not exist"}
     return post
 
 
+def publication_inbox():
+    from app.model import engine
+    from app.models.posts import Post
+    return Inbox(engine, Post.__table__)
+
+
 @app.post("/post/", status_code=204)
-async def post(
-    webhook_input: WebhookData,
-    request: Request,
-    response: Response,
-    x_ghost_signature: str = Header(None),
-    x_hook_signature: str = Header(None),
-):
-    if not x_ghost_signature and not x_hook_signature:
-        logger.error("No X-Ghost-Signature header provided")
-        response.status_code = 400
-        return {"result": "Invalid message signature"}
-
-    hmac_header_search = re.search("sha256=(.*), t=([0-9]*)", x_ghost_signature)
-    if not hmac_header_search:
-        logger.error(
-            f"Invalid message signature. Expected token in format 'sha256=.*, t=[0-9]*' but got {x_ghost_signature}"
-        )
-        response.status_code = 401
-        return {"result": "Invalid message signature"}
-
-    sha256, timestamp = hmac_header_search.group(1, 2)
-
-    raw_input = await request.body()
-    input_hmac = hmac.new(
-        key=os.getenv("WEBHOOK_SECRET").encode(),
-        msg=raw_input + timestamp.encode(),
-        digestmod="sha256",
-    )
-
-    if not hmac.compare_digest(input_hmac.hexdigest(), sha256):
-        logger.error(
-            f"Invalid message signature. Expected token {input_hmac.hexdigest()} but got {sha256}"
-        )
-        response.status_code = 401
-        return {"result": "Invalid message signature"}
-
-    logger.info("Message signature checked ok")
-
-    post_data = json.loads(raw_input)["post"]["current"]
-    id = post_data["id"]
-    title = post_data["title"]
-    link = post_data["url"]
-    content = post_data["plaintext"]
-    primary_tag = post_data["primary_tag"]["slug"]
-
-    if not primary_tag.endswith("news"):
-        await post_controller.create(id, title, link, content)
+async def post(request: Request):
+    try:
+        # Bound actual received bytes, not merely the client-controlled length.
+        raw = bytearray()
+        async for chunk in request.stream():
+            if len(raw) + len(chunk) > 256 * 1024:
+                raise Rejected(413)
+            raw.extend(chunk)
+        raw = bytes(raw)
+        authenticate(raw, request.headers, os.getenv('WEBHOOK_SECRET'))
+        enabled = os.getenv('PUBLICATION_SYNC_ENABLED', '0') == '1'
+        item = normalize(raw, require_revision=enabled)
+        if enabled:
+            inbox = getattr(request.app.state, 'publication_inbox', None)
+            if inbox is None:
+                inbox = publication_inbox()
+            # Transaction commits before acknowledging Ghost; no background task.
+            await run_in_threadpool(inbox.enqueue, item)
+        elif item['eligible']:
+            from app.controllers import post_controller
+            await post_controller.create(item['id'], item['title'], item['url'], item['plaintext'])
+        return Response(status_code=204)
+    except Rejected as error:
+        return Response(status_code=error.status)
+    except Exception:
+        # Never expose SQL parameters, article content, signatures or secrets.
+        return Response(status_code=503)
 
 
 if __name__ == "__main__":
     import uvicorn
     from app.models import posts
-
-    posts.Post.run()
-
-    uvicorn.run(
-        app,
-        host=os.getenv("API_HOST", "localhost"),
-        port=int(os.getenv("API_PORT", "8000")),
-        proxy_headers=True,
-    )
+    posts.Post.run()  # Legacy posts schema only; never provisions the inbox.
+    uvicorn.run(app, host=os.getenv("API_HOST", "localhost"),
+                port=int(os.getenv("API_PORT", "8000")), proxy_headers=True)

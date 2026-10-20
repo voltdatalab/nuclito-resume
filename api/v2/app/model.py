@@ -21,13 +21,10 @@ pool_size = int(os.getenv("DB_POOL_SIZE", 20))
 max_overflow = int(os.getenv("DB_MAX_OVERFLOW", 0))
 pool_recycle = int(os.getenv("DB_POOL_RECYCLE", 300))
 
-engine = create_engine(
-    url_object,
-    echo=True,
-    pool_size=pool_size,
-    max_overflow=max_overflow,
-    pool_recycle=pool_recycle,
-)
+engine_options = dict(echo=False, hide_parameters=True, pool_recycle=pool_recycle)
+if url_object.get_backend_name() != 'sqlite':
+    engine_options.update(pool_size=pool_size, max_overflow=max_overflow)
+engine = create_engine(url_object, **engine_options)
 
 
 class Model(DeclarativeBase):
