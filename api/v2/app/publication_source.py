@@ -16,14 +16,14 @@ import ssl
 import time
 from urllib.parse import urlencode, urlsplit
 from app.publication_sync import Rejected
+from app.publication_origin import source_origins
 
 MAX_RESPONSE = 2 * 1024 * 1024
-ORIGINS = {'https://nucleo.jor.br', 'https://www.nucleo.jor.br'}
 
 
 class PinnedHTTPSConnection(http.client.HTTPSConnection):
     def connect(self):
-        if self.host not in {'nucleo.jor.br', 'www.nucleo.jor.br'} or self.port != 443:
+        if 'https://' + self.host not in source_origins() or self.port != 443:
             raise Rejected()
         addresses = socket.getaddrinfo(self.host, 443, type=socket.SOCK_STREAM)
         if not addresses or any(not ipaddress.ip_address(a[4][0]).is_global for a in addresses):
@@ -39,7 +39,11 @@ class PinnedHTTPSConnection(http.client.HTTPSConnection):
 
 class GhostAdmin:
     def __init__(self, origin, key):
-        if origin not in ORIGINS or not re.fullmatch(r'[0-9a-f]{24}:[0-9a-f]{64}', key):
+        try:
+            allowed = source_origins()
+        except ValueError:
+            raise Rejected() from None
+        if origin not in allowed or not re.fullmatch(r'[0-9a-f]{24}:[0-9a-f]{64}', key):
             raise Rejected()
         self.host = urlsplit(origin).hostname
         self.kid, secret = key.split(':')

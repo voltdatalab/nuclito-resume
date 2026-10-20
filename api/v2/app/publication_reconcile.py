@@ -31,6 +31,7 @@ def reconcile(inbox, source, *, pages=1, known=20, page_size=20):
         raise Rejected()
     # Missing schema fails BEFORE CMS I/O. No implicit DDL here.
     with inbox.engine.begin() as conn:
+        inbox.check_database_origin(conn)
         cursor = conn.execute(select(cursor_table).where(cursor_table.c.name == 'ghost')).mappings().first()
         if cursor is None:
             conn.execute(insert(cursor_table).values(name='ghost', page=1, after_id='', version=0))
@@ -75,6 +76,7 @@ def reconcile(inbox, source, *, pages=1, known=20, page_size=20):
     if len(ids) <= known:
         after = ''
     with inbox.engine.begin() as conn:
+        inbox.check_database_origin(conn)
         changed = conn.execute(update(cursor_table).where(
             cursor_table.c.name == 'ghost', cursor_table.c.version == cursor['version']).values(
                 page=page, after_id=after, version=cursor['version'] + 1))

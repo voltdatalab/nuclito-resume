@@ -1,11 +1,17 @@
+import os
+from dotenv import load_dotenv
+from app.publication_origin import STAGING, source_origin, source_origins
+
+load_dotenv()
+# Staging must never enter the legacy controller/IA path. Check before
+# importing the HTTP app, inbox, model or controller, not on first request.
+if source_origin() == STAGING and os.getenv('PUBLICATION_SYNC_ENABLED') != '1':
+    raise ValueError('Invalid publication source configuration')
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
-from dotenv import load_dotenv
 from app.publication_sync import Inbox, Rejected, authenticate, normalize
-import os
-
-load_dotenv()
 APP_NAME = os.getenv("APP_NAME", "nuclito-responde.api.v2")
 app = FastAPI(
     title=APP_NAME,
@@ -14,7 +20,8 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "*").split(),
+    allow_origins=(sorted(source_origins()) if 'PUBLICATION_SOURCE_ORIGIN' in os.environ
+                   else os.getenv("CORS_ALLOWED_ORIGINS", "*").split()),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

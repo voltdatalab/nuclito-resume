@@ -1,9 +1,11 @@
 """Production adapter; worker tests inject generation instead of calling a model."""
 import importlib
 import json
+from app.publication_sync import canonical_url
 
 
 async def generate(item):
+    canonical_url(item['url'])
     controller = importlib.import_module('app.controllers.post_controller')
     summary = await controller.query_gpt_json(
         'Faça um resumo deste texto em 3 tópicos, usando no máximo 30 palavras para cada tópico. '

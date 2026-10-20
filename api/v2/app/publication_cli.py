@@ -39,6 +39,12 @@ def main(argv=None):
         parser.error('worker requires --run and PUBLICATION_SYNC_ENABLED=1')
     engine = None
     try:
+        from app.publication_origin import source_origin
+        source_origin()
+        if args.command == 'reconcile':
+            from app.publication_source import GhostAdmin
+            source = GhostAdmin(os.getenv('PUBLICATION_GHOST_ADMIN_ORIGIN', ''),
+                                os.getenv('PUBLICATION_GHOST_ADMIN_KEY', ''))
         # Deliberately after all opt-in checks; reuses the existing engine config.
         from app.model import engine
         from app.publication_sync import Inbox, provision, work_once
@@ -48,9 +54,6 @@ def main(argv=None):
         elif args.command == 'reconcile':
             from app.models.posts import Post
             from app.publication_reconcile import reconcile
-            from app.publication_source import GhostAdmin
-            source = GhostAdmin(os.getenv('PUBLICATION_GHOST_ADMIN_ORIGIN', ''),
-                                os.getenv('PUBLICATION_GHOST_ADMIN_KEY', ''))
             counts = reconcile(Inbox(engine, Post.__table__), source, pages=args.pages,
                                known=args.known, page_size=args.page_size)
             print('Reconciled pages={pages} checked={checked}.'.format(**counts))

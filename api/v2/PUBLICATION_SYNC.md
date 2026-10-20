@@ -7,8 +7,30 @@
 - HMAC-SHA256 sobre **bytes exatos do corpo + timestamp textual em ms**, janela ±300s. `X-Ghost-Signature`, fallback `X-Hook-Signature` somente com principal ausente/vazio. Segredo ausente/placeholder público `secret`: `503`. Autenticação antes de JSON. Limite real recebido 256 KiB, inclusive chunks; normalizador também limita bytes.
 - Modo novo exige `event` **no JSON assinado**: `post.published`, `post.published.edited`, `post.edited`, `post.unpublished`, `post.deleted`. Ausente/desconhecido: `400`. Deleted/unpublished **sempre suprimem**, mesmo se `post.current` completo ainda declarar `published/public` (formato Ghost 6.61). Conteúdo dispensável da retirada não impede tombstone. Também aceita `current:null` + `previous.id` e `previous.deleted_at`/`updated_at`; não inventa ordem pelo recebimento.
 - ID: 24 hex minúsculos. Datas UTC canônicas `YYYY-MM-DDTHH:MM:SS[.ffffff]Z` (ou offset UTC `+00:00`, normalizado para o mesmo watermark). URL HTTPS canônica `nucleo.jor.br`/`www.nucleo.jor.br`, caminho terminado em `/`, sem credenciais, porta explícita, query, fragmento, escapes, controles ou segmentos de navegação. Título ≤1000 caracteres, plaintext/HTML ≤200000 cada; plaintext não vazio para publicar. Corpo >256 KiB rejeitado independentemente de elegibilidade.
-- Só `status=published` **e** `visibility=public`, tags estruturalmente válidas; tag primária nula válida. **Diferença intencional do RAG:** resumos mantêm exclusão legada de tag primária terminada em `news`; RAG pode aceitar newsletter pública. Não é divergência de autenticação/retirada. Supressão persiste só identidade/watermark/elegibilidade/digest, nunca título/texto/URL.
+- Só `status=published` **e** `visibility=public`, tags estruturalmente válidas; tag primária nula válida. **Diferença intencional do RAG:** resumos mantêm exclusão legada de tag primária terminada em `news`; RAG pode aceitar newsletter pública. Não é divergência de autenticação/retirada. Supressão persiste só identidade/watermark/elegibilidade/digest e URL canônica de origem verificada, nunca título/texto. Tombstone sem URL só é admitido para ID com evidência local persistida; conserva essa URL para que uma troca acidental de configuração não perca a prova de origem.
 - POST: `204` após commit durável; `401` assinatura inválida; `400` envelope/campos; `409` conflito público na mesma revisão; `413` excesso; `503` segredo/schema/DB. Logs/erros não incluem corpo, assinatura, credenciais ou SQL. SQL echo desativado/parâmetros ocultados.
+
+## Origem confiável e isolamento de staging
+
+`PUBLICATION_SOURCE_ORIGIN` tem apenas dois valores configuráveis exatos: `https://nucleo.jor.br` (default quando ausente) ou `https://staging.nucleo.jor.br` (opt-in exclusivo). Não aceita barra final, portas, userinfo, sufixos, query/fragmento nem `www` como valor de configuração. Produção continua aceitando o alias legado `https://www.nucleo.jor.br` nas URLs de artigos e na Admin API; staging **não** aceita esse alias, `www.staging`, produção ou outros hosts.
+
+A mesma política protege normalização, páginas/IDs do reconciliador, host TLS/DNS do fetch, jobs persistidos antes da geração, adapter, finish e leituras verificadas. URLs presentes nas retiradas também são validadas, inclusive `previous.url`; tombstones sem URL exigem prova local do ID no banco, além do segredo HMAC **distinto por ambiente**. Enqueue/upsert, claim (antes de token/lease/tentativas), expiração, finish e fail validam as URLs conhecidas da inbox e do post dentro da transação; conflito rejeita sem mutar o alvo. O cursor sem namespace exige uma inspeção local das URLs persistidas antes de criação/avanço e aborta em banco de origem conhecida incompatível; essa inspeção de segurança percorre o banco e não está limitada pelo orçamento de chamadas CMS. Não classifica registros históricos sem origem conhecida nem torna bancos compartilhados seguros. URLs de posts nunca escolhem destino de fetch. Origem Admin deve pertencer ao ambiente selecionado, mantendo chave Admin só em ambiente. CLI valida origem/chave antes de importar engine; no-op continua sem I/O.
+
+Com `PUBLICATION_SOURCE_ORIGIN` explícita, CORS é limitado às origens do ambiente (produção + alias legado ou apenas staging), ignorando `CORS_ALLOWED_ORIGINS=*`. Sem essa variável, CORS legado permanece inalterado. **Compatibilidade explícita:** com sync OFF e variável ausente, o contrato antigo de URLs arbitrárias permanece, exceto staging bloqueado; configurar a variável torna também esse ingresso estrito. Homologação deve usar sync ON; modo OFF continua tendo GET legado e não oferece isolamento de dados de um banco indevidamente compartilhado. Bancos, credenciais, segredos e volumes separados são pré-requisitos, não substituídos por esta política.
+
+Configuração pública proposta para o serviço isolado, sem executá-la:
+
+```sh
+export PUBLICATION_SOURCE_ORIGIN=https://staging.nucleo.jor.br
+export PUBLICATION_GHOST_ADMIN_ORIGIN=https://staging.nucleo.jor.br
+export PUBLICATION_SYNC_ENABLED=1
+export CORS_ALLOWED_ORIGINS=https://staging.nucleo.jor.br
+# WEBHOOK_SECRET e PUBLICATION_GHOST_ADMIN_KEY: provisionar separados, nunca copiar produção.
+python -m app.publication_cli reconcile --apply --pages 1 --known 1 --page-size 1
+python -m app.publication_cli worker --run --once
+```
+
+`--once` limita a um claim, não a uma chamada LLM (o adapter pode fazer três); requer aprovação de custo para execução real. Não instalar worker/cron nem usar loop ilimitado nesta rodada. Alteração de ambiente exige reiniciar por rota autorizada para reconstruir o middleware CORS; não trocar origem de um processo ativo ou reaproveitar banco de outro ambiente.
 
 ## Watermark, geração e data pública
 
@@ -24,7 +46,7 @@ Worker: claim atômico, lease 120s, até cinco claims por conteúdo (crashes inc
 
 CLI faz uma fatia por execução, para agendamento operacional externo após autorização. **Não instala cron/supervisor.** Usa o mesmo `normalize` + `Inbox.enqueue` do webhook; reconciliação não gera resumos.
 
-- Ghost Admin API por JWT HS256, audience `/admin/`, validade 5min. `PUBLICATION_GHOST_ADMIN_ORIGIN`: exatamente `https://nucleo.jor.br` ou `https://www.nucleo.jor.br`. `PUBLICATION_GHOST_ADMIN_KEY`: só ambiente, nunca argumento/relatório. Content API pública não decide privacidade.
+- Ghost Admin API por JWT HS256, audience `/admin/`, validade 5min. `PUBLICATION_GHOST_ADMIN_ORIGIN`: produção aceita exatamente `https://nucleo.jor.br` ou `https://www.nucleo.jor.br`; opt-in staging aceita só `https://staging.nucleo.jor.br`. `PUBLICATION_GHOST_ADMIN_KEY`: só ambiente, nunca argumento/relatório. Content API pública não decide privacidade.
 - HTTPS com CAs do sistema/verificação de hostname. DNS: todas as respostas precisam ser IPs globais; socket fixa endereço validado, preservando SNI/hostname original, sem segunda resolução. Sem redirects, proxies, `.netrc` ou URLs derivadas de posts. Timeout socket 10s; resposta ≤2 MiB. 401/403/429/5xx, TLS, JSON inválido e timeout são falhas, **não deleções**.
 - `publication_reconcile_cursor` persiste página Admin e watermark de IDs conhecidos independentes, com CAS de versão. Páginas ordenadas por ID, `filter=status:[published,draft,scheduled,sent]`, tags e plaintext/HTML. Cicla à primeira página no fim. Offset pode se deslocar durante mudanças no CMS; ciclos repetidos e sondas individuais corrigem isso, sem promessa de snapshot global.
 - GET autoritativo dos IDs da **união `posts` legados + inbox**, em lotes keyset cíclicos. Não se limita a IDs já admitidos na inbox. IDs legados não-Ghost são pulados e ocultos no modo novo. Legados públicos válidos entram no mesmo fluxo e só aparecem após geração nova; resumo antigo não é considerado verificado.

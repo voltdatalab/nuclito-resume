@@ -21,7 +21,7 @@ def test_bounded_scan_persist_restart_and_cyclic_known_legacy_checks(tmp_path):
     inbox = sync.Inbox(engine, posts)
     legacy = 'b' * 24
     with engine.begin() as conn:
-        conn.execute(insert(posts).values(id=legacy, title='legacy'))
+        conn.execute(insert(posts).values(id=legacy, title='legacy', link='https://nucleo.jor.br/legacy/'))
     current = json.loads(event())['post']['current']
 
     class Source:
@@ -206,7 +206,7 @@ def test_apply_cli_offline_wiring_and_opt_in(tmp_path, monkeypatch, capsys):
     sync_module().provision(engine)
     monkeypatch.setattr(model, 'engine', engine)
     with engine.begin() as conn:
-        conn.execute(insert(posts).values(id='a' * 24, title='legacy'))
+        conn.execute(insert(posts).values(id='a' * 24, title='legacy', link='https://nucleo.jor.br/legacy/'))
     calls = []
     class Source:
         def __init__(self, origin, key):

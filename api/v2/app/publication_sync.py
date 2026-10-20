@@ -4,7 +4,9 @@ import hmac
 import re
 import time
 import json
+import os
 from datetime import datetime, timezone
+from app.publication_origin import source_origins
 from sqlalchemy import (MetaData, Table, Column, String, Text, BigInteger, Integer, Index,
                         select, insert, update, delete)
 from sqlalchemy.dialects.mysql import LONGTEXT
@@ -42,6 +44,32 @@ class Inbox:
         self.engine = engine
         self.posts = posts
 
+    def local_evidence(self, connection, identity):
+        """Lock and validate every known URL for this ID before a mutation.
+
+        Unknown legacy origin is not proof of membership. This is a wrong-DB
+        tripwire, not a namespace or support for shared databases.
+        """
+        row = connection.execute(select(inbox_table).where(
+            inbox_table.c.id == identity).with_for_update()).mappings().first()
+        post = connection.execute(select(self.posts.c.link).where(
+            self.posts.c.id == identity).with_for_update()).first()
+        try:
+            urls = [json.loads(row['payload']).get('url')] if row else []
+            if post:
+                urls.append(post.link)
+            known = [canonical_url(url) for url in urls if url is not None]
+            return known[0] if known else None
+        except (ValueError, TypeError, AttributeError, KeyError):
+            raise Rejected() from None
+
+    def check_database_origin(self, connection):
+        """Do not create/advance the unnamespaced cursor in a known wrong DB."""
+        identities = set(connection.execute(select(inbox_table.c.id)).scalars())
+        identities.update(connection.execute(select(self.posts.c.id)).scalars())
+        for identity in sorted(identities):
+            self.local_evidence(connection, identity)
+
     def read_verified(self, *, identity=None, page=0, amount=6):
         """Only completed current inbox versions are readable in the new mode."""
         query = select(self.posts).join(inbox_table, self.posts.c.id == inbox_table.c.id).where(
@@ -53,6 +81,8 @@ class Inbox:
         try:
             with self.engine.connect() as connection:
                 rows = connection.execute(query).mappings().all()
+            for row in rows:
+                canonical_url(row['link'])
             if identity is not None:
                 return ({'summary': json.loads(rows[0]['summary']),
                          'summary_en': json.loads(rows[0]['summary_en'])} if rows else None)
@@ -65,16 +95,24 @@ class Inbox:
     def claim(self, *, now, lease=120, max_attempts=5):
         import uuid
         with self.engine.begin() as connection:
-            connection.execute(update(inbox_table).where(
+            # Validate the entire bulk-expiry write set before changing any row.
+            expired = connection.execute(select(inbox_table.c.id).where(
                 inbox_table.c.status.in_(['pending', 'processing']),
                 inbox_table.c.available_at <= now,
-                inbox_table.c.attempts >= max_attempts).values(status='dead', token=None))
+                inbox_table.c.attempts >= max_attempts).with_for_update()).scalars().all()
+            for identity in expired:
+                if self.local_evidence(connection, identity) is None:
+                    raise Rejected()
+            connection.execute(update(inbox_table).where(
+                inbox_table.c.id.in_(expired)).values(status='dead', token=None))
             row = connection.execute(select(inbox_table).where(
                 inbox_table.c.status.in_(['pending', 'processing']),
                 inbox_table.c.available_at <= now, inbox_table.c.attempts < max_attempts
             ).order_by(inbox_table.c.available_at, inbox_table.c.id).limit(1).with_for_update()).mappings().first()
             if not row:
                 return None
+            if self.local_evidence(connection, row['id']) is None:
+                raise Rejected()
             token = uuid.uuid4().hex
             changed = connection.execute(update(inbox_table).where(
                 inbox_table.c.id == row['id'], inbox_table.c.revision == row['revision'],
@@ -87,6 +125,8 @@ class Inbox:
 
     def fail(self, job, *, now, max_attempts):
         with self.engine.begin() as connection:
+            if self.local_evidence(connection, job['id']) is None:
+                raise Rejected()
             connection.execute(update(inbox_table).where(
                 inbox_table.c.id == job['id'], inbox_table.c.digest == job['digest'],
                 inbox_table.c.token == job['token'], inbox_table.c.status == 'processing'
@@ -102,12 +142,15 @@ class Inbox:
                     isinstance(point, str) and point.strip() for point in points):
                 raise Rejected()
         with self.engine.begin() as connection:
+            if self.local_evidence(connection, job['id']) is None:
+                raise Rejected()
             row = connection.execute(select(inbox_table).where(
                 inbox_table.c.id == job['id']).with_for_update()).mappings().one()
             if (row['status'] != 'processing' or row['token'] != job['token']
                     or row['digest'] != job['digest']):
                 return False
             item = json.loads(row['payload'])
+            canonical_url(item['url'])
             values = dict(title=item['title'], title_en=result['title_en'], link=item['url'],
                           summary=json.dumps(result['summary'], ensure_ascii=False),
                           summary_en=json.dumps(result['summary_en'], ensure_ascii=False),
@@ -122,6 +165,16 @@ class Inbox:
         for _ in range(3):
             try:
                 with self.engine.begin() as connection:
+                    known_url = self.local_evidence(connection, item['id'])
+                    item = dict(item)
+                    if item.get('url') is None:
+                        if known_url is None:
+                            raise Rejected()
+                        item['url'] = known_url
+                    try:
+                        canonical_url(item['url'])
+                    except (ValueError, TypeError, AttributeError):
+                        raise Rejected() from None
                     row = connection.execute(select(inbox_table).where(
                         inbox_table.c.id == item['id']).with_for_update()).mappings().first()
                     if expected is not None and (tuple((row['revision'], row['digest'])) if row else (None, None)) != expected:
@@ -169,7 +222,9 @@ async def work_once(inbox, generate, *, now=None, max_attempts=5):
     if job is None:
         return False
     try:
-        result = await generate(json.loads(job['payload']))
+        item = json.loads(job['payload'])
+        canonical_url(item['url'])  # Check durable jobs again before any provider call.
+        result = await generate(item)
         inbox.finish(job, result)
     except Exception:
         inbox.fail(job, now=now if fixed_clock else int(time.time()), max_attempts=max_attempts)
@@ -189,8 +244,8 @@ def utc_revision(value, *, strict=True):
 def canonical_url(value):
     from urllib.parse import urlsplit
     parsed = urlsplit(value)
-    if (parsed.scheme != 'https' or parsed.netloc not in {'nucleo.jor.br', 'www.nucleo.jor.br'}
-            or parsed.query or parsed.fragment or not parsed.path.startswith('/')
+    if (parsed.scheme != 'https' or 'https://' + parsed.netloc not in source_origins()
+            or '?' in value or '#' in value or not parsed.path.startswith('/')
             or not parsed.path.endswith('/') or '\\' in value or '%' in value
             or any(ord(c) <= 32 for c in value) or '//' in parsed.path
             or any(part in {'.', '..'} for part in parsed.path.split('/'))):
@@ -202,6 +257,7 @@ def normalize(raw, *, require_revision=True):
     if len(raw) > 256 * 1024:
         raise Rejected(413)
     try:
+        source_origins()  # Reject invalid trusted config even for contentless tombstones.
         body = json.loads(raw)
         event = body.get('event')
         if require_revision and event not in {'post.published', 'post.published.edited', 'post.edited', 'post.unpublished', 'post.deleted'}:
@@ -211,6 +267,7 @@ def normalize(raw, *, require_revision=True):
         if current is None:
             previous = envelope['previous']
             current = {'id': previous['id'],
+                       'url': previous.get('url'),
                        'updated_at': previous.get('deleted_at') or previous['updated_at'],
                        'status': 'deleted', 'visibility': None}
         identity = current['id']
@@ -231,6 +288,23 @@ def normalize(raw, *, require_revision=True):
                     and current.get('status') == 'published' and current.get('visibility') == 'public'
                     and valid_tags and valid_primary and not newsletter)
         payload = {'id': identity, 'revision': revision, 'eligible': eligible}
+        strict_origin = require_revision or 'PUBLICATION_SOURCE_ORIGIN' in os.environ
+        # Every supplied envelope URL is evidence of origin, even when a
+        # minimal current tombstone has no URL of its own.
+        for supplied in (envelope.get('current'), envelope.get('previous')):
+            if supplied is None or supplied.get('url') is None:
+                continue
+            if strict_origin:
+                canonical_url(supplied['url'])
+                if not eligible:
+                    payload['url'] = supplied['url']
+            else:
+                # Preserve the explicit OFF-mode arbitrary-URL legacy contract,
+                # but never let that compatibility path ingest staging.
+                from urllib.parse import urlsplit
+                host = urlsplit(supplied['url']).hostname or ''
+                if host == 'staging.nucleo.jor.br' or host.endswith('.staging.nucleo.jor.br'):
+                    raise ValueError()
         if eligible:
             for key, limit in [('title', 1000), ('plaintext', 200000), ('html', 200000)]:
                 if key in current and (not isinstance(current[key], str) or len(current[key]) > limit):
@@ -242,8 +316,6 @@ def normalize(raw, *, require_revision=True):
                 payload[key] = value
             if len(payload['url']) > 256:
                 raise ValueError()
-            if require_revision:
-                canonical_url(payload['url'])
             if current.get('published_at') is not None:
                 payload['published_at'] = utc_revision(current['published_at'], strict=require_revision)
         payload['digest'] = hashlib.sha256(json.dumps(
