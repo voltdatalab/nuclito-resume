@@ -1,0 +1,4 @@
+# Disposable CI MySQL gate only; production requirements stay unchanged.
+-r requirements-test.txt
+mysqlclient==2.3.0
+pytest-timeout==2.4.0
