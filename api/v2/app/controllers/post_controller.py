@@ -1,4 +1,3 @@
-from openai import OpenAI
 from dotenv import load_dotenv
 from app.models.posts import Post
 import os
@@ -18,23 +17,29 @@ def get_valid_json_array(arraystr: str) -> str:
 
 locale.setlocale(locale.LC_ALL, "")
 load_dotenv()
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai_client = None
 openai_model = os.getenv("OPENAI_MODEL", "gpt-5-nano")
+
+
+def get_openai_client():
+    global openai_client
+    if openai_client is None:
+        from openai import OpenAI
+        openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), timeout=30.0, max_retries=0)
+    return openai_client
 
 
 # Try generating summaries until GPT-4 returns a valid JSON array
 async def query_gpt_json(query: str, max_tries: int = 5):
     for _ in range(max_tries):
-        chat_completion = openai_client.chat.completions.create(
+        chat_completion = get_openai_client().chat.completions.create(
             messages=[{"role": "user", "content": query}],
             model=openai_model,
         )
 
         for choice in chat_completion.choices:
             summary = choice.message.content
-            print(f"Received summary: {summary}")
             json_summary = get_valid_json_array(summary)
-            print(f"Valid summary: {json_summary}")
             if json_summary is not None:
                 return json_summary
 
@@ -42,7 +47,7 @@ async def query_gpt_json(query: str, max_tries: int = 5):
 
 
 async def query_gpt_str(query: str):
-    chat_completion = openai_client.chat.completions.create(
+    chat_completion = get_openai_client().chat.completions.create(
         messages=[{"role": "user", "content": query}],
         model=openai_model,
     )
