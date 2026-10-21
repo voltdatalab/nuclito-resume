@@ -1,78 +1,323 @@
-name: Summary MySQL 8 and production image homologation
+name: Staging image capacity preflight (no deploy)
 
 on:
-  pull_request:
   push:
-    branches: ['feat/**', 'feature/**', 'test/**', 'ci/**', 'fix/**']
+    branches: ['ci/staging-capacity-preflight']
+    paths: ['.github/workflows/summary-homologation.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: summary-homologation-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: capacity-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  mysql-and-image:
+  capacity:
+    if: github.ref == 'refs/heads/ci/staging-capacity-preflight'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_DATABASE: nuclito_ci
-          MYSQL_ROOT_PASSWORD: fixture-root-only
-          MYSQL_ROOT_HOST: '%'
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pfixture-root-only --silent"
-          --health-interval=5s --health-timeout=3s --health-retries=30
-          --memory=1g --cpus=2
+    timeout-minutes: 60
     env:
-      PYTHON_DOTENV_DISABLED: '1'
-      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      APP_SHA: 'caa126952c133ea8c9c325a29efff42f2e3ad94e'
+      APP_CONTEXT: 'api/v2'
+      MEASURE_MYSQL: 'true'
+      MYSQL_DIGEST: 'sha256:6f3a50835c54d61ffdcf78d71381ba268c27804cd96755231d2fd6f180f822f0'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout approved application SHA only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: 'caa126952c133ea8c9c325a29efff42f2e3ad94e'
+          path: application
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.10'
-      - name: Private test environment (not production dependencies)
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+      - name: Serial build and pull with numeric-only sampled report
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential pkg-config default-libmysqlclient-dev
-          python -m venv "$RUNNER_TEMP/summary-tests"
-          "$RUNNER_TEMP/summary-tests/bin/python" -m pip install -r api/v2/requirements-mysql-test.txt
-          "$RUNNER_TEMP/summary-tests/bin/python" -c "import MySQLdb, sqlalchemy, pytest; from importlib.metadata import version; assert version('mysqlclient') == '2.3.0'; print('mysqlclient', version('mysqlclient'), 'SQLAlchemy', sqlalchemy.__version__)"
-      - name: Offline gate-tool regressions
-        run: '"$RUNNER_TEMP/summary-tests/bin/python" -m pytest gate_tests -q'
-      - name: Independent offline SQLite unit runner
-        working-directory: api/v2
-        env:
-          PYTHONPATH: .
-        run: '"$RUNNER_TEMP/summary-tests/bin/python" -m pytest tests -q'
-      - name: Real MySQL 8 gate (missing DSN is an error, never skipped)
-        working-directory: api/v2
-        env:
-          PYTHONPATH: .
-          NUCLITO_MYSQL_TEST_DSN: mysql+mysqldb://root:fixture-root-only@127.0.0.1:3306/nuclito_ci
-        run: |
-          "$RUNNER_TEMP/summary-tests/bin/python" -m pytest mysql_tests -q --strict-markers --timeout=30 --junitxml="$RUNNER_TEMP/mysql-results.xml"
-          "$RUNNER_TEMP/summary-tests/bin/python" ../../scripts/check_mysql_receipt.py "$RUNNER_TEMP/mysql-results.xml"
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build exact production Dockerfile/context, locally loaded only
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+          python3 - <<'PY'
+          """Hosted-only numeric image-capacity probe; never starts containers."""
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import socket
+          import http.client
+          import subprocess
+          import sys
+          import tempfile
+          import threading
+          import time
+          import urllib.request
+
+          REPORT = {"schema": 1, "status": "started", "phases": [], "limitations": [
+              "Sampled peaks are observed lower bounds, not guaranteed worst-case peaks.",
+              "Hosted runner filesystem, storage driver and cache differ from target CapRover host.",
+              "No-cache rebuilds instructions, but preexisting base layers/content may be reused.",
+              "Host used-byte deltas include unrelated runner activity; du walks are not atomic.",
+              "Compressed pull bytes are exact manifest layer descriptor sums, not measured network traffic.",
+              "Built images are not published; metadata digest is not a pullable registry reference.",
+              "No runtime containers, database initialization, deploy, cleanup or prune are performed."
+          ]}
+          DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
+          DU_INCOMPLETE_WALKS = 0
+
+
+          def cli(args, timeout=60):
+              p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                 timeout=timeout, check=True)
+              return p.stdout
+
+
+          def du(path, apparent=False):
+              global DU_INCOMPLETE_WALKS
+              args = ["du", "-s", "-B1"]
+              if apparent:
+                  args.append("--apparent-size")
+              p = subprocess.run(["sudo", "-n"] + args + [str(path)], stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL, timeout=120, check=False)
+              # Active build paths can disappear during a non-atomic walk (du exit 1).
+              if p.returncode not in (0, 1) or not p.stdout.split():
+                  raise RuntimeError("du_read_failed")
+              if p.returncode == 1:
+                  DU_INCOMPLETE_WALKS += 1
+              return int(p.stdout.split()[0])
+
+
+          def fs(path):
+              s = os.statvfs(path)
+              return {"device": os.stat(path).st_dev, "total_bytes": s.f_blocks * s.f_frsize,
+                      "used_bytes": (s.f_blocks - s.f_bfree) * s.f_frsize,
+                      "available_bytes": s.f_bavail * s.f_frsize}
+
+
+          def context_stats(path):
+              regular = links = file_bytes = 0
+              for base, dirs, files in os.walk(path, followlinks=False):
+                  for n in files:
+                      p = pathlib.Path(base) / n
+                      if p.is_symlink():
+                          links += 1
+                      elif p.is_file():
+                          regular += 1
+                          file_bytes += p.stat().st_size
+                  for n in dirs:
+                      if (pathlib.Path(base) / n).is_symlink():
+                          links += 1
+              return {"regular_file_count": regular, "symlink_count": links,
+                      "regular_file_content_bytes": file_bytes,
+                      "du_allocated_bytes": du(path), "du_apparent_bytes": du(path, True)}
+
+
+          def archive_bytes(source):
+              with tempfile.TemporaryFile() as output:
+                  subprocess.run(["git", "-C", str(source), "archive", "--format=tar", "HEAD"],
+                                 stdout=output, stderr=subprocess.DEVNULL, timeout=120, check=True)
+                  return output.tell()
+
+
+          class UnixHTTP(http.client.HTTPConnection):
+              def connect(self):
+                  self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                  self.sock.settimeout(self.timeout)
+                  self.sock.connect("/var/run/docker.sock")
+
+
+          def cache_stats(api_version):
+              c = UnixHTTP("localhost", timeout=120)
+              try:
+                  c.request("GET", "/v" + api_version + "/system/df")
+                  r = c.getresponse()
+                  if r.status != 200:
+                      raise RuntimeError("cache_read_failed")
+                  data = json.loads(r.read())
+              finally:
+                  c.close()
+              images, cache, containers, volumes = [data.get(k) or [] for k in
+                                                  ("Images", "BuildCache", "Containers", "Volumes")]
+              return {"image_count": len(images), "image_logical_sum_bytes": sum(i["Size"] for i in images),
+                      "build_cache_record_count": len(cache),
+                      "build_cache_logical_sum_bytes": sum(i.get("Size", 0) for i in cache),
+                      "container_count": len(containers), "volume_count": len(volumes),
+                      "layers_size_bytes": data.get("LayersSize")}
+
+
+          def snapshot(roots):
+              return {"elapsed_ns": time.monotonic_ns(), "root_filesystem": fs("/"),
+                      "workspace_filesystem": fs(os.environ["GITHUB_WORKSPACE"]),
+                      "docker_filesystems": [fs(p) for p in roots],
+                      "docker_allocated_bytes": [du(p) for p in roots]}
+
+
+          def measure_phase(name, args, roots, private_dir, timeout):
+              phase = {"name": name, "samples": [], "sampling_target_interval_seconds": 2}
+              REPORT["phases"].append(phase)
+              stop = threading.Event()
+              errors = []
+              phase["samples"].append(snapshot(roots))
+              def sample_loop():
+                  while not stop.wait(2):
+                      try:
+                          phase["samples"].append(snapshot(roots))
+                      except Exception:
+                          errors.append("sampling_failed")
+                          return
+              thread = threading.Thread(target=sample_loop, daemon=True)
+              thread.start()
+              logpath = private_dir / (name + ".log")
+              t0 = time.monotonic_ns()
+              code = -1
+              try:
+                  with logpath.open("wb") as log:
+                      os.chmod(logpath, 0o600)
+                      try:
+                          p = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT,
+                                             timeout=timeout, check=False)
+                          code = p.returncode
+                      except subprocess.TimeoutExpired:
+                          code = 124
+              finally:
+                  stop.set()
+                  thread.join(timeout=260)
+                  if thread.is_alive():
+                      raise RuntimeError("sampler_join_failed")
+                  phase["samples"].append(snapshot(roots))
+                  phase["duration_ns"] = time.monotonic_ns() - t0
+                  phase["exit_code"] = code
+                  phase["raw_log_bytes_discarded"] = logpath.stat().st_size
+                  logpath.unlink()
+              samples = phase["samples"]
+              phase["sample_count"] = len(samples)
+              phase["max_observed_sample_gap_ns"] = max(b["elapsed_ns"] - a["elapsed_ns"]
+                  for a, b in zip(samples, samples[1:]))
+              phase["peak_host_used_increase_bytes"] = max(0, max(s["root_filesystem"]["used_bytes"]
+                  for s in samples) - samples[0]["root_filesystem"]["used_bytes"])
+              phase["peak_docker_allocated_increase_bytes"] = max(0, max(sum(s["docker_allocated_bytes"])
+                  for s in samples) - sum(samples[0]["docker_allocated_bytes"]))
+              if errors or code != 0:
+                  raise RuntimeError("phase_failed")
+              return phase
+
+
+          def image_stats(ref):
+              data = json.loads(cli(["docker", "image", "inspect", ref]))[0]
+              if not DIGEST.fullmatch(data["Id"]):
+                  raise RuntimeError("invalid_image_id")
+              return {"id": data["Id"], "size_bytes": data["Size"],
+                      "os": data["Os"], "architecture": data["Architecture"],
+                      "repo_digests": data.get("RepoDigests") or [],
+                      "uncompressed_layer_count": len(data["RootFS"]["Layers"]),
+                      "uncompressed_layer_diff_ids": data["RootFS"]["Layers"]}
+
+
+          def mysql_registry(digest):
+              if not DIGEST.fullmatch(digest):
+                  raise RuntimeError("invalid_mysql_digest")
+              def request(url, headers=None):
+                  with urllib.request.urlopen(urllib.request.Request(url, headers=headers or {}), timeout=60) as r:
+                      return r.read()
+              token = json.loads(request("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/mysql:pull"))["token"]
+              headers = {"Authorization": "Bearer " + token,
+                         "Accept": "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"}
+              body = request("https://registry-1.docker.io/v2/library/mysql/manifests/" + digest, headers)
+              if "sha256:" + hashlib.sha256(body).hexdigest() != digest:
+                  raise RuntimeError("manifest_hash_mismatch")
+              m = json.loads(body)
+              cfg = json.loads(request("https://registry-1.docker.io/v2/library/mysql/blobs/" + m["config"]["digest"], headers))
+              if (cfg["os"], cfg["architecture"]) != ("linux", "amd64"):
+                  raise RuntimeError("wrong_mysql_platform")
+              return {"reference": "mysql:8.4@" + digest, "platform_digest": digest,
+                      "config_digest": m["config"]["digest"], "manifest_bytes": len(body),
+                      "config_bytes": m["config"]["size"], "compressed_layer_count": len(m["layers"]),
+                      "compressed_layer_bytes": sum(x["size"] for x in m["layers"])}
+
+
+          def main():
+              if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+                  raise RuntimeError("hosted_runner_required")
+              source = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "application"
+              sha = cli(["git", "-C", str(source), "rev-parse", "HEAD"]).decode().strip()
+              if sha != os.environ["APP_SHA"]:
+                  raise RuntimeError("source_sha_mismatch")
+              context = source / os.environ["APP_CONTEXT"]
+              dockerfile = context / "Dockerfile"
+              REPORT["provenance"] = {"application_sha": sha, "repository": os.environ["GITHUB_REPOSITORY"],
+                  "workflow_sha": os.environ["GITHUB_SHA"], "workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
+                  "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "runner_arch": os.environ["RUNNER_ARCH"], "context_path": os.environ["APP_CONTEXT"],
+                  "dockerfile_sha256": hashlib.sha256(dockerfile.read_bytes()).hexdigest()}
+              REPORT["context"] = context_stats(context)
+              REPORT["source_archive_bytes"] = archive_bytes(source)
+              REPORT["source_checkout"] = context_stats(source)
+              ignore = context / ".dockerignore"
+              REPORT["context"]["dockerignore_sha256"] = hashlib.sha256(ignore.read_bytes()).hexdigest() if ignore.exists() else None
+              REPORT["limitations"].append("Context du/counts describe the complete checked-out directory before dockerignore filtering; source archive excludes checkout .git. Build context transfer display is not used as an exact byte count.")
+              info = json.loads(cli(["docker", "info", "--format", "{{json .}}"], 120))
+              version = json.loads(cli(["docker", "version", "--format", "{{json .Server}}"], 120))
+              roots = [pathlib.Path(info["DockerRootDir"])]
+              containerd = pathlib.Path("/var/lib/containerd")
+              if containerd.exists() and not containerd.is_relative_to(roots[0]):
+                  roots.append(containerd)
+              REPORT["docker"] = {"server_version": version["Version"], "api_version": version["ApiVersion"],
+                  "storage_driver": info["Driver"], "storage_roots": [str(p) for p in roots],
+                  "driver_status": info.get("DriverStatus"),
+                  "buildx_version": cli(["docker", "buildx", "version"]).decode().strip()}
+              REPORT["baseline_cache"] = cache_stats(version["ApiVersion"])
+              REPORT["baseline"] = snapshot(roots)
+              with tempfile.TemporaryDirectory(prefix="capacity-private-", dir=os.environ["RUNNER_TEMP"]) as tmp:
+                  private = pathlib.Path(tmp)
+                  metadata = private / "metadata.json"
+                  tag = "capacity-probe:" + sha
+                  measure_phase("application_build", ["docker", "buildx", "build", "--platform", "linux/amd64",
+                      "--no-cache", "--pull", "--load", "--progress=plain", "--metadata-file", str(metadata),
+                      "-t", tag, "-f", str(dockerfile), str(context)], roots, private, 1800)
+                  REPORT["application_image"] = image_stats(tag)
+                  md = json.loads(metadata.read_bytes())
+                  REPORT["application_image"]["build_metadata_digests"] = {k: v for k, v in md.items()
+                      if k in ("containerimage.digest", "containerimage.config.digest")
+                      and isinstance(v, str) and DIGEST.fullmatch(v)}
+                  if os.environ["MEASURE_MYSQL"] == "true":
+                      mysql = mysql_registry(os.environ["MYSQL_DIGEST"])
+                      REPORT["mysql_registry"] = mysql
+                      measure_phase("mysql_pull_after_application", ["docker", "pull", "--platform", "linux/amd64",
+                          mysql["reference"]], roots, private, 600)
+                      REPORT["mysql_image"] = image_stats(mysql["reference"])
+                      if (REPORT["mysql_image"]["os"], REPORT["mysql_image"]["architecture"]) != ("linux", "amd64"):
+                          raise RuntimeError("pulled_mysql_platform_mismatch")
+                      if REPORT["mysql_image"]["id"] != mysql["config_digest"]:
+                          raise RuntimeError("pulled_mysql_config_mismatch")
+              REPORT["final_cache"] = cache_stats(version["ApiVersion"])
+              REPORT["final"] = snapshot(roots)
+              all_samples = [REPORT["baseline"], REPORT["final"]] + [s for p in REPORT["phases"] for s in p["samples"]]
+              REPORT["observed_serial_host_increase_bytes"] = max(0, max(s["root_filesystem"]["used_bytes"] for s in all_samples)
+                  - REPORT["baseline"]["root_filesystem"]["used_bytes"])
+              REPORT["observed_serial_docker_allocated_increase_bytes"] = max(0, max(sum(s["docker_allocated_bytes"]) for s in all_samples)
+                  - sum(REPORT["baseline"]["docker_allocated_bytes"]))
+              REPORT["status"] = "success"
+              REPORT["incomplete_du_walk_count"] = DU_INCOMPLETE_WALKS
+              REPORT["limitations"].append("du exit 1 during concurrent file deletion is accepted as a partial non-atomic walk and counted in incomplete_du_walk_count.")
+
+
+          if __name__ == "__main__":
+              try:
+                  main()
+              except Exception:
+                  REPORT["status"] = "failed"
+                  REPORT["error_code"] = "measurement_failed_raw_details_suppressed"
+              output = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "capacity-report.json"
+              output.write_text(json.dumps(REPORT, indent=2) + "\n")
+              print(json.dumps({"status": REPORT["status"], "phases_completed": len(REPORT["phases"])}))
+              sys.exit(0 if REPORT["status"] == "success" else 1)
+          PY
+      - name: Upload allowlisted numeric report only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          context: ./api/v2
-          file: ./api/v2/Dockerfile
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: nuclito-summary-ci:gate
-          provenance: false
-      - name: Real production CMD smoke on internal-only network
-        env:
-          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
-        run: 'python scripts/container_smoke.py --image nuclito-summary-ci:gate --mysql-container "$MYSQL_CONTAINER"'
+          name: capacity-report-${{ github.run_id }}
+          path: capacity-report.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+          include-hidden-files: false
