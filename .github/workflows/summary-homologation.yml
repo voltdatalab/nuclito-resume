@@ -73,7 +73,7 @@ jobs:
 
           def du(path, apparent=False):
               global DU_INCOMPLETE_WALKS
-              args = ["du", "-s", "-B1"]
+              args = ["du", "-s", "-x", "-B1"]
               if apparent:
                   args.append("--apparent-size")
               p = subprocess.run(["sudo", "-n"] + args + [str(path)], stdout=subprocess.PIPE,
@@ -163,7 +163,7 @@ jobs:
                           phase["samples"].append(snapshot(roots))
                       except Exception:
                           errors.append("sampling_failed")
-                          return
+                          continue
               thread = threading.Thread(target=sample_loop, daemon=True)
               thread.start()
               logpath = private_dir / (name + ".log")
@@ -196,7 +196,8 @@ jobs:
                   for s in samples) - samples[0]["root_filesystem"]["used_bytes"])
               phase["peak_docker_allocated_increase_bytes"] = max(0, max(sum(s["docker_allocated_bytes"])
                   for s in samples) - sum(samples[0]["docker_allocated_bytes"]))
-              if errors or code != 0:
+              phase["sampling_error_count"] = len(errors)
+              if code != 0:
                   raise RuntimeError("phase_failed")
               return phase
 
@@ -243,6 +244,7 @@ jobs:
                   raise RuntimeError("source_sha_mismatch")
               context = source / os.environ["APP_CONTEXT"]
               dockerfile = context / "Dockerfile"
+              REPORT["stage"] = "source_measurement"
               REPORT["provenance"] = {"application_sha": sha, "repository": os.environ["GITHUB_REPOSITORY"],
                   "workflow_sha": os.environ["GITHUB_SHA"], "workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
                   "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
@@ -254,6 +256,7 @@ jobs:
               ignore = context / ".dockerignore"
               REPORT["context"]["dockerignore_sha256"] = hashlib.sha256(ignore.read_bytes()).hexdigest() if ignore.exists() else None
               REPORT["limitations"].append("Context du/counts describe the complete checked-out directory before dockerignore filtering; source archive excludes checkout .git. Build context transfer display is not used as an exact byte count.")
+              REPORT["stage"] = "docker_baseline"
               info = json.loads(cli(["docker", "info", "--format", "{{json .}}"], 120))
               version = json.loads(cli(["docker", "version", "--format", "{{json .Server}}"], 120))
               roots = [pathlib.Path(info["DockerRootDir"])]
@@ -270,24 +273,30 @@ jobs:
                   private = pathlib.Path(tmp)
                   metadata = private / "metadata.json"
                   tag = "capacity-probe:" + sha
+                  REPORT["stage"] = "application_build"
                   measure_phase("application_build", ["docker", "buildx", "build", "--platform", "linux/amd64",
                       "--no-cache", "--pull", "--load", "--progress=plain", "--metadata-file", str(metadata),
                       "-t", tag, "-f", str(dockerfile), str(context)], roots, private, 1800)
+                  REPORT["stage"] = "application_image_inspection"
                   REPORT["application_image"] = image_stats(tag)
                   md = json.loads(metadata.read_bytes())
                   REPORT["application_image"]["build_metadata_digests"] = {k: v for k, v in md.items()
                       if k in ("containerimage.digest", "containerimage.config.digest")
                       and isinstance(v, str) and DIGEST.fullmatch(v)}
                   if os.environ["MEASURE_MYSQL"] == "true":
+                      REPORT["stage"] = "mysql_registry"
                       mysql = mysql_registry(os.environ["MYSQL_DIGEST"])
                       REPORT["mysql_registry"] = mysql
+                      REPORT["stage"] = "mysql_pull"
                       measure_phase("mysql_pull_after_application", ["docker", "pull", "--platform", "linux/amd64",
                           mysql["reference"]], roots, private, 600)
-                      REPORT["mysql_image"] = image_stats(mysql["reference"])
+                      REPORT["stage"] = "mysql_image_inspection"
+                      REPORT["mysql_image"] = image_stats(mysql["config_digest"])
                       if (REPORT["mysql_image"]["os"], REPORT["mysql_image"]["architecture"]) != ("linux", "amd64"):
                           raise RuntimeError("pulled_mysql_platform_mismatch")
                       if REPORT["mysql_image"]["id"] != mysql["config_digest"]:
                           raise RuntimeError("pulled_mysql_config_mismatch")
+              REPORT["stage"] = "final_measurement"
               REPORT["final_cache"] = cache_stats(version["ApiVersion"])
               REPORT["final"] = snapshot(roots)
               all_samples = [REPORT["baseline"], REPORT["final"]] + [s for p in REPORT["phases"] for s in p["samples"]]
@@ -296,16 +305,18 @@ jobs:
               REPORT["observed_serial_docker_allocated_increase_bytes"] = max(0, max(sum(s["docker_allocated_bytes"]) for s in all_samples)
                   - sum(REPORT["baseline"]["docker_allocated_bytes"]))
               REPORT["status"] = "success"
+              REPORT["stage"] = "complete"
               REPORT["incomplete_du_walk_count"] = DU_INCOMPLETE_WALKS
-              REPORT["limitations"].append("du exit 1 during concurrent file deletion is accepted as a partial non-atomic walk and counted in incomplete_du_walk_count.")
+              REPORT["limitations"].append("du -x avoids counting mounted overlay merged trees twice. Exit 1 walks are partial and counted; failed periodic snapshots are counted per phase and widen the observed sampling gap.")
 
 
           if __name__ == "__main__":
               try:
                   main()
-              except Exception:
+              except Exception as error:
                   REPORT["status"] = "failed"
                   REPORT["error_code"] = "measurement_failed_raw_details_suppressed"
+                  REPORT["error_type"] = type(error).__name__
               output = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "capacity-report.json"
               output.write_text(json.dumps(REPORT, indent=2) + "\n")
               print(json.dumps({"status": REPORT["status"], "phases_completed": len(REPORT["phases"])}))
